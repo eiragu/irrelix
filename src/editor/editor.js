@@ -10,6 +10,8 @@
  * 4b:图层完整样式(形状/圆角/边框/透明度/镜像)、画布底色/透明、Panel API 事件
  */
 
+import { LAYOUT_PRESETS, computeLayout } from './layouts.js';
+
 const HANDLE_POSITIONS = ['tl', 'tm', 'tr', 'ml', 'mr', 'bl', 'bm', 'br'];
 
 function icon(path) {
@@ -63,6 +65,8 @@ export class Editor {
     this.btnPlayPause = document.getElementById('btnPlayPause');
     this.btnSeekStart = document.getElementById('btnSeekStart');
     this.playbackTime = document.getElementById('playbackTime');
+    this.btnLayoutMenu = document.getElementById('btnLayoutMenu');
+    this.layoutMenu = document.getElementById('layoutMenu');
 
     this.session = null;
     this.layers = [];
@@ -87,6 +91,7 @@ export class Editor {
 
   _bind() {
     this.btnBack.addEventListener('click', () => this.close());
+    this._buildLayoutMenu();
     this.btnFit.addEventListener('click', () => { this.zoomOverride = null; this.fitToView(); });
     this.btnZoomIn.addEventListener('click', () => this.zoomBy(1.2));
     this.btnZoomOut.addEventListener('click', () => this.zoomBy(1 / 1.2));
@@ -103,6 +108,55 @@ export class Editor {
         this.selectLayer(null);
       }
     });
+  }
+
+  _buildLayoutMenu() {
+    this.layoutMenu.innerHTML = LAYOUT_PRESETS.map((p) => `
+      <div class="layout-menu-item" data-key="${p.key}">
+        <div class="layout-menu-item-icon">${p.icon}</div>
+        <div class="layout-menu-item-text">
+          <div class="layout-menu-item-name">${p.name}</div>
+          <div class="layout-menu-item-hint">${p.hint}</div>
+        </div>
+      </div>
+    `).join('');
+
+    this.btnLayoutMenu.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.layoutMenu.classList.toggle('hidden');
+    });
+
+    this.layoutMenu.addEventListener('click', (e) => {
+      const item = e.target.closest('.layout-menu-item');
+      if (!item) return;
+      this.applyLayout(item.dataset.key);
+      this.layoutMenu.classList.add('hidden');
+    });
+
+    // 点其他地方关闭菜单
+    document.addEventListener('click', (e) => {
+      if (!this.layoutMenu.classList.contains('hidden') &&
+          !this.btnLayoutMenu.contains(e.target) &&
+          !this.layoutMenu.contains(e.target)) {
+        this.layoutMenu.classList.add('hidden');
+      }
+    });
+  }
+
+  applyLayout(key) {
+    const layout = computeLayout(key, this.canvasW, this.canvasH);
+    if (!layout) return;
+    this.layers.forEach((layer) => {
+      const spec = layout[layer.type];
+      if (!spec) return;
+      // 复制给图层(undefined 字段不覆盖)
+      Object.keys(spec).forEach((k) => {
+        if (spec[k] !== undefined) layer[k] = spec[k];
+      });
+      this._applyLayerStyle(layer);
+      this._emitLayerUpdate(layer);
+    });
+    this.renderLayerList();
   }
 
   onClose(cb) { this._onCloseCallbacks.push(cb); }

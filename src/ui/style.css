@@ -160,6 +160,17 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 }
 .session-delete:hover { background: var(--red); color: #fff; }
 
+.btn-small {
+  background: var(--accent);
+  color: #fff;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.btn-small:hover { transform: translateY(-1px); opacity: 0.9; }
+
 .session-videos {
   display: grid; grid-template-columns: 2fr 1fr; gap: 10px;
 }

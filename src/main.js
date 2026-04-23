@@ -9,10 +9,19 @@ import {
   makeSessionId,
   saveSession,
   listSessions,
+  getSession,
   deleteSession,
   estimateStorage,
   requestPersistent,
 } from './storage/db.js';
+import { Editor } from './editor/editor.js';
+
+const appRoot = document.querySelector('.app');
+const editor = new Editor();
+editor.onClose(() => {
+  appRoot.classList.remove('hidden');
+  // 恢复摄像头预览流(editor 打开时没停它)
+});
 
 const $ = (id) => document.getElementById(id);
 const statusEl = $('status');
@@ -256,6 +265,14 @@ function renderSessionCard(session) {
   }
 
   sessionVideoUrls.set(session.id, camUrl ? [screenUrl, camUrl] : [screenUrl]);
+
+  card.querySelector('.session-edit').addEventListener('click', async () => {
+    // 从 DB 重新拉一次,确保用的是最新持久化的 blob(避免 URL 被 revoke 的问题)
+    const fresh = await getSession(session.id);
+    if (!fresh) return;
+    appRoot.classList.add('hidden');
+    editor.open(fresh);
+  });
 
   card.querySelector('.session-delete').addEventListener('click', async () => {
     if (!confirm('确认删除这条录制?')) return;

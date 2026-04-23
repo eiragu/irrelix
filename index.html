@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>画布 · 录屏工具</title>
+  <link rel="stylesheet" href="/src/ui/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1 class="logo">画布 <span class="ver">v2-step-2</span></h1>
+      <p class="subtitle">最小录屏链路验证</p>
+    </header>
+
+    <main class="main">
+      <div id="status" class="status">准备就绪。点击下方按钮开始 10 秒测试录屏。</div>
+
+      <div class="actions">
+        <button id="btnRecord" class="btn btn-primary">开始录屏(10 秒)</button>
+      </div>
+
+      <div id="progress" class="progress hidden">
+        <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+        <div id="progressText" class="progress-text">录制中…</div>
+      </div>
+
+      <video id="preview" class="preview hidden" controls></video>
+
+      <div id="result" class="result hidden">
+        <p id="resultInfo"></p>
+        <a id="downloadLink" class="btn btn-secondary" download="huabu-test.webm">下载录像</a>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>这是 v2 的第二步骨架验证。后续会加入摄像头双轨、画布编辑器、ffmpeg 导出。</p>
+    </footer>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

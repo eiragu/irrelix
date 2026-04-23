@@ -19,13 +19,16 @@ function fitScreen(W, H, aspect = 16 / 9) {
 
 function fullscreen(W, H) {
   const screen = fitScreen(W, H, 16 / 9);
-  const camSize = Math.round(Math.min(W, H) * 0.18);
-  const margin = Math.round(Math.min(W, H) * 0.03);
+  // 头像按画布长边的 18% 算,窄画布头像会自然小一些,不会显得挤
+  const camSize = Math.round(Math.max(W, H) * 0.18);
+  const marginX = Math.round(Math.min(W, H) * 0.04);
+  // 竖屏默认把头像离底部更远(放在约画布高度的 72% 位置,而不是贴底)
+  const marginY = H > W ? Math.round(H * 0.10) : Math.round(H * 0.05);
   return {
     screen: { ...screen, visible: true },
     cam: {
-      x: W - camSize - margin,
-      y: H - camSize - margin,
+      x: W - camSize - marginX,
+      y: H - camSize - marginY,
       w: camSize, h: camSize,
       visible: true,
       shape: 'circle',
@@ -133,7 +136,7 @@ function rightScreen(W, H) {
 
 function pip(W, H) {
   const screen = fitScreen(W, H, 16 / 9);
-  const camSize = Math.round(Math.min(W, H) * 0.24);
+  const camSize = Math.round(Math.max(W, H) * 0.18);
   return {
     screen: { ...screen, visible: true },
     cam: {
@@ -209,4 +212,9 @@ export function computeLayout(key, W, H) {
   const preset = LAYOUT_PRESETS.find((p) => p.key === key);
   if (!preset) return null;
   return preset.apply(W, H);
+}
+
+// 所有画布尺寸默认都用"全屏"(屏幕适配 + 摄像头圆形右下角)—— 最干净的起点
+export function getDefaultLayoutKey(/* W, H */) {
+  return 'fullscreen';
 }

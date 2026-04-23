@@ -10,7 +10,7 @@
  * 4b:图层完整样式(形状/圆角/边框/透明度/镜像)、画布底色/透明、Panel API 事件
  */
 
-import { LAYOUT_PRESETS, computeLayout } from './layouts.js';
+import { LAYOUT_PRESETS, computeLayout, getDefaultLayoutKey } from './layouts.js';
 
 const HANDLE_POSITIONS = ['tl', 'tm', 'tr', 'ml', 'mr', 'bl', 'bm', 'br'];
 
@@ -187,7 +187,11 @@ export class Editor {
     this.sessionInfoEl.textContent = `${dateStr} · ${this._fmtDuration(session.durationMs)}`;
 
     this._buildLayers(session);
-    this.setCanvasSize(this.canvasW, this.canvasH);
+    // 初始化时就应用默认布局,不是居中占位(懒人模式)
+    this.stage.style.width = `${this.canvasW}px`;
+    this.stage.style.height = `${this.canvasH}px`;
+    const initKey = getDefaultLayoutKey(this.canvasW, this.canvasH);
+    this.applyLayout(initKey);
     this._applyCanvasBg();
     this.fitToView();
     this.renderLayerList();
@@ -204,7 +208,7 @@ export class Editor {
   }
 
   // ========== Canvas size / zoom / background ==========
-  setCanvasSize(w, h) {
+  setCanvasSize(w, h, { autoLayout = true } = {}) {
     const oldW = this.canvasW;
     const oldH = this.canvasH;
     this.canvasW = w;
@@ -213,7 +217,14 @@ export class Editor {
     this.stage.style.height = `${h}px`;
 
     if (this.layers.length && (oldW !== w || oldH !== h)) {
-      this._reflowLayers(oldW, oldH);
+      if (autoLayout) {
+        // "懒人模式":切到新尺寸时自动应用对应的默认布局
+        const key = getDefaultLayoutKey(w, h);
+        this.applyLayout(key);
+      } else {
+        // 保留原有图层相对位置(reflow)
+        this._reflowLayers(oldW, oldH);
+      }
     }
 
     if (this.zoomOverride === null) this.fitToView();

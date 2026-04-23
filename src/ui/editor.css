@@ -334,6 +334,18 @@
 }
 .flip-row .toggle { margin-top: 0; }
 
+.panel-hint {
+  background: rgba(108, 92, 231, 0.1);
+  border: 1px solid rgba(108, 92, 231, 0.35);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--text);
+  margin-bottom: 14px;
+  line-height: 1.7;
+}
+.panel-hint b { color: var(--accent2); font-weight: 600; }
+
 .hidden { display: none !important; }
 
 /* Canvas area */

@@ -11,8 +11,8 @@
 const CANVAS_SIZE_PRESETS = [
   { label: '横 16:9', w: 1920, h: 1080 },
   { label: '竖 9:16', w: 1080, h: 1920 },
-  { label: '横 4:3', w: 1440, h: 1080 },
   { label: '竖 3:4', w: 1080, h: 1440 },
+  { label: '竖 4:5', w: 1080, h: 1350 },
 ];
 
 const BG_COLOR_SWATCHES = ['#000000', '#ffffff', '#1a1f2e', '#2a3042', '#6C5CE7', '#00B4D8', '#FF4757', '#2ED573'];
@@ -110,6 +110,14 @@ export class Panel {
     const borderSwatches = BORDER_COLOR_SWATCHES.map(
       (c) => `<button class="swatch" data-color="${c}" style="background:${c}" title="${c}"></button>`
     ).join('');
+    const topHint = type === 'cam' ? `
+      <div class="panel-hint">
+        💡 <b>怎么改头像大小</b>:<br/>
+        ① 画布上拖动头像四角的蓝点<br/>
+        ② 或在下面的"尺寸"里直接输数字<br/>
+        ③ 嫌背景乱,用最下面"画面裁切"放大脸、避开杂物
+      </div>
+    ` : '';
     const flipSection = type === 'cam' ? `
       <div class="panel-section">
         <div class="panel-label">镜像翻转</div>
@@ -137,6 +145,7 @@ export class Panel {
     ` : '';
 
     return `
+      ${topHint}
       <div class="panel-section">
         <div class="panel-label">位置</div>
         <div class="panel-row2">

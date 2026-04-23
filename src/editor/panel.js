@@ -118,6 +118,22 @@ export class Panel {
           <label class="toggle"><input type="checkbox" data-input="flipV"/>垂直</label>
         </div>
       </div>
+      <div class="panel-section">
+        <div class="panel-label">画面裁切 <span style="color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;">(把脸移到中心,放大避开背景)</span></div>
+        <div class="panel-slider-group">
+          <label>缩放 <span data-val="contentScale">100%</span></label>
+          <input type="range" data-input="contentScale" min="100" max="300" step="5" value="100"/>
+        </div>
+        <div class="panel-slider-group">
+          <label>水平偏移 <span data-val="contentOffsetX">0%</span></label>
+          <input type="range" data-input="contentOffsetX" min="-50" max="50" step="1" value="0"/>
+        </div>
+        <div class="panel-slider-group">
+          <label>垂直偏移 <span data-val="contentOffsetY">0%</span></label>
+          <input type="range" data-input="contentOffsetY" min="-50" max="50" step="1" value="0"/>
+        </div>
+        <button class="panel-btn" data-act="resetCrop" style="width:100%;margin-top:4px;">重置裁切</button>
+      </div>
     ` : '';
 
     return `
@@ -257,6 +273,18 @@ export class Panel {
       this.editor.updateLayerProps(layer.id, { flipH: el.checked });
     } else if (input === 'flipV') {
       this.editor.updateLayerProps(layer.id, { flipV: el.checked });
+    } else if (input === 'contentScale') {
+      const v = Number(el.value);
+      this._setSpan(el, `${v}%`);
+      this.editor.updateLayerProps(layer.id, { contentScale: v / 100 });
+    } else if (input === 'contentOffsetX') {
+      const v = Number(el.value);
+      this._setSpan(el, `${v}%`);
+      this.editor.updateLayerProps(layer.id, { contentOffsetX: v / 100 });
+    } else if (input === 'contentOffsetY') {
+      const v = Number(el.value);
+      this._setSpan(el, `${v}%`);
+      this.editor.updateLayerProps(layer.id, { contentOffsetY: v / 100 });
     }
   }
 
@@ -323,6 +351,12 @@ export class Panel {
       if (!layer) return;
       if (act === 'bringToTop') this.editor.bringToTop(layer.id);
       if (act === 'sendToBottom') this.editor.sendToBottom(layer.id);
+      if (act === 'resetCrop') {
+        this.editor.updateLayerProps(layer.id, {
+          contentScale: 1, contentOffsetX: 0, contentOffsetY: 0,
+        });
+        this._refreshCamPane();
+      }
     }
   }
 
@@ -398,6 +432,12 @@ export class Panel {
     if (layer.type === 'cam') {
       setVal('flipH', layer.flipH);
       setVal('flipV', layer.flipV);
+      setVal('contentScale', Math.round((layer.contentScale ?? 1) * 100));
+      setVal('contentOffsetX', Math.round((layer.contentOffsetX ?? 0) * 100));
+      setVal('contentOffsetY', Math.round((layer.contentOffsetY ?? 0) * 100));
+      this._setSpan(pane.querySelector('[data-input="contentScale"]'), `${Math.round((layer.contentScale ?? 1) * 100)}%`);
+      this._setSpan(pane.querySelector('[data-input="contentOffsetX"]'), `${Math.round((layer.contentOffsetX ?? 0) * 100)}%`);
+      this._setSpan(pane.querySelector('[data-input="contentOffsetY"]'), `${Math.round((layer.contentOffsetY ?? 0) * 100)}%`);
     }
     this._syncSegActive(pane.querySelector('[data-seg="shape"]'), layer.shape);
     this._setSpan(pane.querySelector('[data-input="radius"]'), `${Math.round(layer.radius ?? 0)}px`);

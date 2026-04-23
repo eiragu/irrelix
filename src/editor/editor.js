@@ -39,6 +39,10 @@ const CAM_LAYER_DEFAULTS = {
   lockRatio: true,
   flipH: true,
   flipV: false,
+  // 画面裁切(在外框内部对视频内容做二次构图)
+  contentScale: 1,    // 1.0 - 3.0
+  contentOffsetX: 0,  // -0.5 to +0.5 (相对视频宽度的百分比)
+  contentOffsetY: 0,
 };
 
 export class Editor {
@@ -365,11 +369,18 @@ export class Editor {
       s.boxShadow = '';
     }
 
-    // 摄像头镜像
+    // 摄像头镜像 + 画面内裁切(缩放/平移)
     if (layer.type === 'cam' && layer.videoEl) {
-      const sx = layer.flipH ? -1 : 1;
-      const sy = layer.flipV ? -1 : 1;
-      layer.videoEl.style.transform = `scale(${sx}, ${sy})`;
+      const cs = layer.contentScale ?? 1;
+      const sx = (layer.flipH ? -1 : 1) * cs;
+      const sy = (layer.flipV ? -1 : 1) * cs;
+      // 镜像时 translate 方向要反向,让滑块"右"始终看起来是画面"右"
+      const txSign = layer.flipH ? -1 : 1;
+      const tySign = layer.flipV ? -1 : 1;
+      const tx = (layer.contentOffsetX ?? 0) * 100 * txSign;
+      const ty = (layer.contentOffsetY ?? 0) * 100 * tySign;
+      layer.videoEl.style.transform = `translate(${tx}%, ${ty}%) scale(${sx}, ${sy})`;
+      layer.videoEl.style.transformOrigin = 'center center';
     }
 
     layer.el.classList.toggle('locked', layer.locked);

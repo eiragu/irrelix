@@ -15,12 +15,13 @@ import {
   requestPersistent,
 } from './storage/db.js';
 import { Editor } from './editor/editor.js';
+import { Panel } from './editor/panel.js';
 
 const appRoot = document.querySelector('.app');
 const editor = new Editor();
+const panel = new Panel(editor);
 editor.onClose(() => {
   appRoot.classList.remove('hidden');
-  // 恢复摄像头预览流(editor 打开时没停它)
 });
 
 const $ = (id) => document.getElementById(id);

@@ -1,17 +1,13 @@
 /**
- * 画布编辑器(v1.0 第四步 · 4a)
+ * 画布编辑器(v1.0 第四步 · 4a + 4b)
  *
  * 坐标系:
  *   - 画布有"真实像素"尺寸(如 1080×1920),图层的 x/y/w/h 用的也是真实像素
  *   - 显示时用 CSS transform: scale(displayScale) 缩放整个 stage 到屏幕可见尺寸
  *   - 鼠标事件中的 dx/dy 要除以 displayScale 才能映射回真实像素
  *
- * 4a 范围:
- *   - 画布尺寸切换(16:9 / 9:16 / 1:1 / 4:3)
- *   - 两个默认图层(屏幕 + 摄像头),DOM video 元素即图层内容
- *   - 拖拽移动 / 8 个控制点缩放 / Shift 等比 / 置上/置下
- *   - 图层列表(显示/隐藏 / 锁定 / 选中)
- *   - 简易同步播放(两个 video 用同一个虚拟时间戳)
+ * 4a:画布尺寸、拖拽缩放、图层列表、同步播放
+ * 4b:图层完整样式(形状/圆角/边框/透明度/镜像)、画布底色/透明、Panel API 事件
  */
 
 const HANDLE_POSITIONS = ['tl', 'tm', 'tr', 'ml', 'mr', 'bl', 'bm', 'br'];
@@ -24,6 +20,27 @@ const ICON_EYE_OFF = icon('<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11
 const ICON_LOCK = icon('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>');
 const ICON_UNLOCK = icon('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>');
 
+const COMMON_LAYER_DEFAULTS = {
+  opacity: 1,
+  borderOn: false,
+  borderWidth: 2,
+  borderColor: '#ffffff',
+  visible: true,
+  locked: false,
+};
+const SCREEN_LAYER_DEFAULTS = {
+  shape: 'rectangle', // 'rectangle' | 'rounded'
+  radius: 0,
+  lockRatio: true,
+};
+const CAM_LAYER_DEFAULTS = {
+  shape: 'rectangle', // 'circle' | 'square' | 'rectangle'
+  radius: 0,
+  lockRatio: true,
+  flipH: true,
+  flipV: false,
+};
+
 export class Editor {
   constructor() {
     this.root = document.getElementById('editorView');
@@ -31,7 +48,6 @@ export class Editor {
     this.stageWrapper = document.getElementById('canvasStageWrapper');
     this.canvasInfo = document.getElementById('canvasInfo');
     this.layerListEl = document.getElementById('layerList');
-    this.canvasSizeBtns = document.getElementById('canvasSizeBtns');
     this.editorTitle = document.getElementById('editorTitle');
     this.sessionInfoEl = document.getElementById('editorSessionInfo');
     this.btnBack = document.getElementById('editorBack');
@@ -45,31 +61,28 @@ export class Editor {
     this.playbackTime = document.getElementById('playbackTime');
 
     this.session = null;
-    this.layers = []; // [{ id, type, videoEl, x, y, w, h, visible, locked, el, frameEl, handlesEl, lockRatio }]
+    this.layers = [];
     this.selectedId = null;
     this.canvasW = 1080;
     this.canvasH = 1920;
     this.displayScale = 1;
-    this.zoomOverride = null; // null = auto-fit, number = 用户手动的 zoom
+    this.zoomOverride = null;
     this.objectUrls = [];
     this.isPlaying = false;
     this.rafId = null;
+
+    this.canvasBg = { type: 'color', color: '#000000' };
+
     this._onCloseCallbacks = [];
+    this._selectionListeners = [];
+    this._layerUpdateListeners = [];
+    this._canvasUpdateListeners = [];
 
     this._bind();
   }
 
   _bind() {
     this.btnBack.addEventListener('click', () => this.close());
-    this.canvasSizeBtns.querySelectorAll('.canvas-size-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const w = parseInt(btn.dataset.w, 10);
-        const h = parseInt(btn.dataset.h, 10);
-        this.setCanvasSize(w, h);
-        this.canvasSizeBtns.querySelectorAll('.canvas-size-btn').forEach((b) => b.classList.remove('active'));
-        btn.classList.add('active');
-      });
-    });
     this.btnFit.addEventListener('click', () => { this.zoomOverride = null; this.fitToView(); });
     this.btnZoomIn.addEventListener('click', () => this.zoomBy(1.2));
     this.btnZoomOut.addEventListener('click', () => this.zoomBy(1 / 1.2));
@@ -81,8 +94,6 @@ export class Editor {
       if (!this.isOpen()) return;
       if (this.zoomOverride === null) this.fitToView();
     });
-
-    // 点击画布空白区域取消选中
     this.stageWrapper.addEventListener('pointerdown', (e) => {
       if (e.target === this.stageWrapper || e.target === this.stage) {
         this.selectLayer(null);
@@ -91,6 +102,20 @@ export class Editor {
   }
 
   onClose(cb) { this._onCloseCallbacks.push(cb); }
+  onSelectionChange(cb) { this._selectionListeners.push(cb); }
+  onLayerUpdate(cb) { this._layerUpdateListeners.push(cb); }
+  onCanvasUpdate(cb) { this._canvasUpdateListeners.push(cb); }
+
+  _emitSelection() {
+    const layer = this.selectedId ? this.getLayer(this.selectedId) : null;
+    this._selectionListeners.forEach((cb) => cb(layer));
+  }
+  _emitLayerUpdate(layer) {
+    this._layerUpdateListeners.forEach((cb) => cb(layer));
+  }
+  _emitCanvasUpdate() {
+    this._canvasUpdateListeners.forEach((cb) => cb());
+  }
 
   isOpen() { return !this.root.classList.contains('hidden'); }
 
@@ -105,9 +130,11 @@ export class Editor {
 
     this._buildLayers(session);
     this.setCanvasSize(this.canvasW, this.canvasH);
+    this._applyCanvasBg();
     this.fitToView();
     this.renderLayerList();
     this.selectLayer(this.layers[this.layers.length - 1]?.id || null);
+    this._emitCanvasUpdate();
   }
 
   close() {
@@ -118,15 +145,52 @@ export class Editor {
     this._onCloseCallbacks.forEach((cb) => cb());
   }
 
-  // ========== Canvas size / zoom ==========
+  // ========== Canvas size / zoom / background ==========
   setCanvasSize(w, h) {
+    const oldW = this.canvasW;
+    const oldH = this.canvasH;
     this.canvasW = w;
     this.canvasH = h;
     this.stage.style.width = `${w}px`;
     this.stage.style.height = `${h}px`;
+
+    if (this.layers.length && (oldW !== w || oldH !== h)) {
+      this._reflowLayers(oldW, oldH);
+    }
+
     if (this.zoomOverride === null) this.fitToView();
     else this._applyScale(this.zoomOverride);
     this._updateCanvasInfo();
+    this._emitCanvasUpdate();
+  }
+
+  _reflowLayers(oldW, oldH) {
+    this.layers.forEach((layer) => {
+      const cxRel = (layer.x + layer.w / 2) / oldW;
+      const cyRel = (layer.y + layer.h / 2) / oldH;
+
+      let newW = layer.w;
+      let newH = layer.h;
+      const maxW = this.canvasW;
+      const maxH = this.canvasH;
+      if (newW > maxW || newH > maxH) {
+        const s = Math.min(maxW / newW, maxH / newH);
+        newW *= s;
+        newH *= s;
+      }
+
+      let newX = cxRel * this.canvasW - newW / 2;
+      let newY = cyRel * this.canvasH - newH / 2;
+      newX = Math.max(0, Math.min(this.canvasW - newW, newX));
+      newY = Math.max(0, Math.min(this.canvasH - newH, newY));
+
+      layer.x = newX;
+      layer.y = newY;
+      layer.w = newW;
+      layer.h = newH;
+      this._applyLayerStyle(layer);
+      this._emitLayerUpdate(layer);
+    });
   }
 
   fitToView() {
@@ -156,9 +220,31 @@ export class Editor {
     this.canvasInfo.textContent = `${this.canvasW} × ${this.canvasH} · ${Math.round(this.displayScale * 100)}%`;
   }
 
+  setCanvasBg(bg) {
+    Object.assign(this.canvasBg, bg);
+    this._applyCanvasBg();
+    this._emitCanvasUpdate();
+  }
+
+  _applyCanvasBg() {
+    if (this.canvasBg.type === 'transparent') {
+      // 棋盘格表示透明
+      this.stage.style.background = `
+        linear-gradient(45deg, #3a4050 25%, transparent 25%),
+        linear-gradient(-45deg, #3a4050 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #3a4050 75%),
+        linear-gradient(-45deg, transparent 75%, #3a4050 75%)
+      `;
+      this.stage.style.backgroundSize = '16px 16px';
+      this.stage.style.backgroundPosition = '0 0, 0 8px, 8px -8px, 8px 0';
+      this.stage.style.backgroundColor = '#2a3042';
+    } else {
+      this.stage.style.background = this.canvasBg.color || '#000000';
+    }
+  }
+
   // ========== Layers ==========
   _buildLayers(session) {
-    // screen layer: 默认按 16:9 铺在画布上半区
     const screenAspect = 16 / 9;
     let screenW = this.canvasW;
     let screenH = screenW / screenAspect;
@@ -175,7 +261,6 @@ export class Editor {
       y: (this.canvasH - screenH) / 2,
       w: screenW,
       h: screenH,
-      lockRatio: true,
     });
     this.layers.push(screenLayer);
 
@@ -193,7 +278,6 @@ export class Editor {
         y: this.canvasH - camH - 40,
         w: camW,
         h: camH,
-        lockRatio: true,
       });
       this.layers.push(camLayer);
     }
@@ -210,10 +294,7 @@ export class Editor {
     video.muted = true;
     video.playsInline = true;
     video.preload = 'auto';
-    video.addEventListener('loadedmetadata', () => {
-      // 同步时间显示
-      this._updatePlaybackTime();
-    });
+    video.addEventListener('loadedmetadata', () => this._updatePlaybackTime());
     el.appendChild(video);
 
     const hitbox = document.createElement('div');
@@ -236,10 +317,11 @@ export class Editor {
 
     this.stage.appendChild(el);
 
+    const typeDefaults = opts.type === 'screen' ? SCREEN_LAYER_DEFAULTS : CAM_LAYER_DEFAULTS;
     const layer = {
+      ...COMMON_LAYER_DEFAULTS,
+      ...typeDefaults,
       ...opts,
-      visible: true,
-      locked: false,
       el,
       videoEl: video,
       frameEl: frame,
@@ -253,16 +335,48 @@ export class Editor {
   }
 
   _applyLayerStyle(layer) {
-    layer.el.style.left = `${layer.x}px`;
-    layer.el.style.top = `${layer.y}px`;
-    layer.el.style.width = `${layer.w}px`;
-    layer.el.style.height = `${layer.h}px`;
+    const s = layer.el.style;
+    s.left = `${layer.x}px`;
+    s.top = `${layer.y}px`;
+    s.width = `${layer.w}px`;
+    s.height = `${layer.h}px`;
+    s.opacity = layer.opacity ?? 1;
+    s.overflow = 'hidden';
+
+    // 形状 → border-radius
+    let radius = 0;
+    if (layer.type === 'screen') {
+      radius = layer.shape === 'rounded' ? (layer.radius ?? 0) : 0;
+    } else {
+      if (layer.shape === 'circle') {
+        radius = Math.min(layer.w, layer.h) / 2;
+      } else if (layer.shape === 'rectangle') {
+        radius = layer.radius ?? 0;
+      } else {
+        radius = 0;
+      }
+    }
+    s.borderRadius = `${radius}px`;
+
+    // 边框用 inset box-shadow 画在内部(不影响布局尺寸)
+    if (layer.borderOn && layer.borderWidth > 0) {
+      s.boxShadow = `inset 0 0 0 ${layer.borderWidth}px ${layer.borderColor}`;
+    } else {
+      s.boxShadow = '';
+    }
+
+    // 摄像头镜像
+    if (layer.type === 'cam' && layer.videoEl) {
+      const sx = layer.flipH ? -1 : 1;
+      const sy = layer.flipV ? -1 : 1;
+      layer.videoEl.style.transform = `scale(${sx}, ${sy})`;
+    }
+
     layer.el.classList.toggle('locked', layer.locked);
     layer.el.classList.toggle('hidden-layer', !layer.visible);
   }
 
   _attachLayerEvents(layer) {
-    // Click to select + start drag
     layer.hitbox.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       e.stopPropagation();
@@ -270,8 +384,6 @@ export class Editor {
       if (layer.locked) return;
       this._startDrag(layer, e);
     });
-
-    // Handles
     layer.handlesEl.addEventListener('pointerdown', (e) => {
       const target = e.target.closest('.handle');
       if (!target || layer.locked) return;
@@ -293,6 +405,7 @@ export class Editor {
       layer.x = origX + dx;
       layer.y = origY + dy;
       this._applyLayerStyle(layer);
+      this._emitLayerUpdate(layer);
     };
     const onUp = () => {
       document.removeEventListener('pointermove', onMove);
@@ -311,7 +424,6 @@ export class Editor {
     const origH = layer.h;
     const aspect = origW / origH;
 
-    // 每个 handle 控制哪些边变化
     const dirs = {
       tl: { dx: -1, dy: -1, mx: 1, my: 1 },
       tm: { dx: 0, dy: -1, mx: 0, my: 1 },
@@ -325,6 +437,9 @@ export class Editor {
 
     e.target.setPointerCapture?.(e.pointerId);
 
+    // 圆形/正方形强制 1:1
+    const forceSquare = layer.type === 'cam' && (layer.shape === 'circle' || layer.shape === 'square');
+
     const onMove = (ev) => {
       const rawDx = (ev.clientX - startX) / this.displayScale;
       const rawDy = (ev.clientY - startY) / this.displayScale;
@@ -332,9 +447,8 @@ export class Editor {
       let dw = rawDx * dirs.dx;
       let dh = rawDy * dirs.dy;
 
-      const lockRatio = ev.shiftKey || (layer.lockRatio && dirs.dx !== 0 && dirs.dy !== 0);
+      const lockRatio = forceSquare || ev.shiftKey || (layer.lockRatio && dirs.dx !== 0 && dirs.dy !== 0);
       if (lockRatio && dirs.dx !== 0 && dirs.dy !== 0) {
-        // 用主导方向(abs 较大的)决定缩放因子
         if (Math.abs(dw) > Math.abs(dh)) dh = dw / aspect;
         else dw = dh * aspect;
       }
@@ -343,10 +457,15 @@ export class Editor {
       let newW = Math.max(minSize, origW + dw);
       let newH = Math.max(minSize, origH + dh);
 
-      // 若锁比例但任意维度被 clamp 到 minSize,补偿另一维
       if (lockRatio) {
         if (newW === minSize) newH = Math.max(minSize, newW / aspect);
         if (newH === minSize) newW = Math.max(minSize, newH * aspect);
+      }
+
+      if (forceSquare) {
+        const size = Math.max(newW, newH);
+        newW = size;
+        newH = size;
       }
 
       layer.w = newW;
@@ -354,6 +473,7 @@ export class Editor {
       layer.x = origX + (origW - newW) * dirs.mx;
       layer.y = origY + (origH - newH) * dirs.my;
       this._applyLayerStyle(layer);
+      this._emitLayerUpdate(layer);
     };
     const onUp = () => {
       document.removeEventListener('pointermove', onMove);
@@ -368,6 +488,7 @@ export class Editor {
     this.layers.forEach((l) => l.el.classList.toggle('selected', l.id === id));
     this.renderLayerList();
     this._updateLayerButtons();
+    this._emitSelection();
   }
 
   _updateLayerButtons() {
@@ -382,15 +503,56 @@ export class Editor {
     const target = idx + delta;
     if (target < 0 || target >= this.layers.length) return;
     [this.layers[idx], this.layers[target]] = [this.layers[target], this.layers[idx]];
-    // 重新排序 DOM(后面的元素在视觉上更上层)
     this.layers.forEach((l) => this.stage.appendChild(l.el));
     this.renderLayerList();
     this._updateLayerButtons();
   }
 
+  bringToTop(id) {
+    const idx = this.layers.findIndex((l) => l.id === id);
+    if (idx < 0 || idx === this.layers.length - 1) return;
+    const [l] = this.layers.splice(idx, 1);
+    this.layers.push(l);
+    this.layers.forEach((ll) => this.stage.appendChild(ll.el));
+    this.renderLayerList();
+    this._updateLayerButtons();
+  }
+
+  sendToBottom(id) {
+    const idx = this.layers.findIndex((l) => l.id === id);
+    if (idx <= 0) return;
+    const [l] = this.layers.splice(idx, 1);
+    this.layers.unshift(l);
+    this.layers.forEach((ll) => this.stage.appendChild(ll.el));
+    this.renderLayerList();
+    this._updateLayerButtons();
+  }
+
+  getLayer(id) {
+    return this.layers.find((l) => l.id === id);
+  }
+
+  updateLayerProps(id, props) {
+    const layer = this.getLayer(id);
+    if (!layer) return;
+
+    // 形状变化时对摄像头强制正方
+    if (props.shape !== undefined && layer.type === 'cam') {
+      if (props.shape === 'circle' || props.shape === 'square') {
+        const size = Math.min(layer.w, layer.h);
+        if (props.w === undefined) props.w = size;
+        if (props.h === undefined) props.h = size;
+        if (props.lockRatio === undefined) props.lockRatio = true;
+      }
+    }
+    Object.assign(layer, props);
+    this._applyLayerStyle(layer);
+    this._emitLayerUpdate(layer);
+    this.renderLayerList();
+  }
+
   renderLayerList() {
     this.layerListEl.innerHTML = '';
-    // 列表倒序显示(最上面的图层在列表最上)
     [...this.layers].reverse().forEach((layer) => {
       const row = document.createElement('div');
       row.className = 'layer-item' + (layer.id === this.selectedId ? ' selected' : '');
@@ -407,6 +569,7 @@ export class Editor {
           if (act === 'visible') layer.visible = !layer.visible;
           if (act === 'lock') layer.locked = !layer.locked;
           this._applyLayerStyle(layer);
+          this._emitLayerUpdate(layer);
           this.renderLayerList();
           return;
         }
@@ -487,5 +650,6 @@ export class Editor {
     this.objectUrls = [];
     this.layerListEl.innerHTML = '';
     this.selectedId = null;
+    this._emitSelection();
   }
 }

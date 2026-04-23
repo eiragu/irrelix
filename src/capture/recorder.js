@@ -23,7 +23,24 @@ export async function captureScreen() {
   });
 }
 
-export function recordStream(stream, { mimeType, timesliceMs = 1000, bitsPerSecond = 6_000_000 } = {}) {
+export async function captureCamera({ video = true, audio = true } = {}) {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error('当前浏览器不支持摄像头 API。');
+  }
+  const constraints = {
+    video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : false,
+    audio,
+  };
+  return await navigator.mediaDevices.getUserMedia(constraints);
+}
+
+export async function listCameras() {
+  if (!navigator.mediaDevices?.enumerateDevices) return [];
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  return devices.filter((d) => d.kind === 'videoinput');
+}
+
+function createRecorder(stream, { mimeType, timesliceMs = 1000, bitsPerSecond = 6_000_000 } = {}) {
   const chunks = [];
   const type = mimeType || pickSupportedMimeType();
   const recorder = new MediaRecorder(stream, {
@@ -38,13 +55,43 @@ export function recordStream(stream, { mimeType, timesliceMs = 1000, bitsPerSeco
   const done = new Promise((resolve, reject) => {
     recorder.onstop = () => {
       const blob = new Blob(chunks, { type: type || 'video/webm' });
-      resolve(blob);
+      resolve({ blob, mimeType: type });
     };
     recorder.onerror = (e) => reject(e.error || new Error('MediaRecorder 错误'));
   });
 
   recorder.start(timesliceMs);
-  return { recorder, done, mimeType: type };
+  return { recorder, done };
+}
+
+export function startDualRecording(screenStream, camStream) {
+  const startedAt = Date.now();
+
+  const screen = createRecorder(screenStream, { bitsPerSecond: 6_000_000 });
+  const cam = camStream
+    ? createRecorder(camStream, { bitsPerSecond: 2_500_000 })
+    : null;
+
+  let stopped = false;
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    try { if (screen.recorder.state !== 'inactive') screen.recorder.stop(); } catch {}
+    try { if (cam && cam.recorder.state !== 'inactive') cam.recorder.stop(); } catch {}
+  };
+
+  const result = Promise.all([
+    screen.done,
+    cam ? cam.done : Promise.resolve(null),
+  ]).then(([s, c]) => ({
+    startedAt,
+    stoppedAt: Date.now(),
+    durationMs: Date.now() - startedAt,
+    screen: s,
+    cam: c,
+  }));
+
+  return { stop, result };
 }
 
 export function stopStream(stream) {

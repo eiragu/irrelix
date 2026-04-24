@@ -17,11 +17,13 @@ import {
 import { Editor } from './editor/editor.js';
 import { Panel } from './editor/panel.js';
 import { Timeline } from './editor/timeline.js';
+import { ExportUI } from './export/export-ui.js';
 
 const appRoot = document.querySelector('.app');
 const editor = new Editor();
 const panel = new Panel(editor);
 const timeline = new Timeline(editor);
+const exportUI = new ExportUI(editor);
 editor.onClose(() => {
   appRoot.classList.remove('hidden');
 });

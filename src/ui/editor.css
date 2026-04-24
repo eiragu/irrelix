@@ -42,9 +42,105 @@
   font-size: 13px;
   font-weight: 500;
   box-shadow: 0 2px 8px rgba(108, 92, 231, 0.3);
-  opacity: 0.5;
-  cursor: not-allowed;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
 }
+.editor-export:hover { background: var(--accent2); }
+.editor-export:active { transform: scale(0.97); }
+.editor-export:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ========== 导出对话框(5a) ========== */
+.export-dialog {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+.export-dialog-box {
+  width: 420px;
+  max-width: calc(100% - 40px);
+  background: #12161f;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+.export-dialog-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.export-dialog-stage {
+  font-size: 12px;
+  color: var(--text2);
+  margin-bottom: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.export-progress-wrap {
+  width: 100%;
+  height: 6px;
+  background: var(--card);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.export-progress-bar {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--accent1), var(--accent2));
+  transition: width 0.2s ease-out;
+}
+.export-dialog-hint {
+  font-size: 11px;
+  color: var(--text2);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+.export-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text);
+  margin-bottom: 12px;
+  user-select: none;
+}
+.export-toggle input[type=checkbox] { margin-top: 2px; accent-color: var(--accent); }
+.export-toggle span { flex: 1; line-height: 1.5; }
+.export-toggle.disabled { opacity: 0.5; cursor: not-allowed; }
+
+.export-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.export-dialog-btn {
+  padding: 8px 18px;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.export-dialog-btn:hover { background: var(--card2); }
+.export-dialog-btn.primary {
+  background: var(--accent);
+  border-color: transparent;
+  font-weight: 500;
+}
+.export-dialog-btn.primary:hover { background: var(--accent2); }
 
 .editor-sidebar {
   grid-area: sb;

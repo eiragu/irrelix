@@ -11,7 +11,7 @@
 <body>
   <div class="app">
     <header class="header">
-      <h1 class="logo">画布 <span class="ver">v2-step-4d</span></h1>
+      <h1 class="logo">画布 <span class="ver">v2-step-5</span></h1>
       <p class="subtitle">双轨录制(屏幕 + 摄像头)</p>
     </header>
 
@@ -72,7 +72,7 @@
       </div>
       <div class="editor-topbar-right">
         <span id="editorSessionInfo" class="editor-title" style="color:var(--text2)"></span>
-        <button class="editor-export" disabled title="导出功能在第五步实现">导出视频(WIP)</button>
+        <button class="editor-export" id="btnExport" title="合成为 mp4 并保存">导出视频</button>
       </div>
     </div>
 
@@ -108,6 +108,22 @@
     <aside class="editor-panel"></aside>
 
     <section class="editor-timeline" id="editorTimeline"></section>
+  </div>
+
+  <!-- 导出对话框 -->
+  <div id="exportDialog" class="export-dialog hidden">
+    <div class="export-dialog-box">
+      <div class="export-dialog-title" id="exportDialogTitle">准备导出…</div>
+      <div class="export-dialog-stage" id="exportDialogStage">初始化中</div>
+      <div class="export-progress-wrap">
+        <div class="export-progress-bar" id="exportProgressBar"></div>
+      </div>
+      <div class="export-dialog-hint" id="exportDialogHint"></div>
+      <div class="export-dialog-actions">
+        <button class="export-dialog-btn" id="exportDialogCancel">取消</button>
+        <button class="export-dialog-btn primary hidden" id="exportDialogSave">保存到本地</button>
+      </div>
+    </div>
   </div>
 
   <template id="sessionCardTemplate">

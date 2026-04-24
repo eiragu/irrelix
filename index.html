@@ -11,7 +11,7 @@
 <body>
   <div class="app">
     <header class="header">
-      <h1 class="logo">画布 <span class="ver">v2-step-3</span></h1>
+      <h1 class="logo">画布 <span class="ver">v2-step-4d</span></h1>
       <p class="subtitle">双轨录制(屏幕 + 摄像头)</p>
     </header>
 
@@ -76,14 +76,10 @@
       </div>
     </div>
 
-    <aside class="editor-timeline">
+    <aside class="editor-sidebar">
       <div class="layer-list">
         <div class="layer-list-title">图层</div>
         <div id="layerList"></div>
-      </div>
-
-      <div class="editor-timeline-placeholder">
-        <p style="opacity:.6">时间轴将在 4d 加入</p>
       </div>
     </aside>
 
@@ -106,16 +102,12 @@
         <div class="canvas-stage" id="canvasStage"></div>
       </div>
 
-      <div class="canvas-playback">
-        <button class="playback-btn" id="btnPlayPause" title="播放/暂停">▶</button>
-        <button class="playback-btn" id="btnSeekStart" title="回到开头">⏮</button>
-        <span class="playback-time" id="playbackTime">00:00 / 00:00</span>
-      </div>
-
       <div class="canvas-info" id="canvasInfo">1080 × 1920 · 100%</div>
     </main>
 
     <aside class="editor-panel"></aside>
+
+    <section class="editor-timeline" id="editorTimeline"></section>
   </div>
 
   <template id="sessionCardTemplate">

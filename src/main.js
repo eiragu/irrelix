@@ -16,10 +16,12 @@ import {
 } from './storage/db.js';
 import { Editor } from './editor/editor.js';
 import { Panel } from './editor/panel.js';
+import { Timeline } from './editor/timeline.js';
 
 const appRoot = document.querySelector('.app');
 const editor = new Editor();
 const panel = new Panel(editor);
+const timeline = new Timeline(editor);
 editor.onClose(() => {
   appRoot.classList.remove('hidden');
 });

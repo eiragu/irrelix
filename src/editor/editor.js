@@ -62,9 +62,6 @@ export class Editor {
     this.btnFit = document.getElementById('btnFitView');
     this.btnZoomIn = document.getElementById('btnZoomIn');
     this.btnZoomOut = document.getElementById('btnZoomOut');
-    this.btnPlayPause = document.getElementById('btnPlayPause');
-    this.btnSeekStart = document.getElementById('btnSeekStart');
-    this.playbackTime = document.getElementById('playbackTime');
     this.btnLayoutMenu = document.getElementById('btnLayoutMenu');
     this.layoutMenu = document.getElementById('layoutMenu');
 
@@ -79,12 +76,19 @@ export class Editor {
     this.isPlaying = false;
     this.rafId = null;
 
+    // 4d-2: session 级 trim(裁掉开头废话和结尾收尾),整条会话一组 in/out
+    this.trimIn = 0;
+    this.trimOut = 0; // open 时初始化为 duration
+
     this.canvasBg = { type: 'color', color: '#000000' };
 
     this._onCloseCallbacks = [];
     this._selectionListeners = [];
     this._layerUpdateListeners = [];
     this._canvasUpdateListeners = [];
+    this._timeUpdateListeners = [];
+    this._playStateListeners = [];
+    this._trimListeners = [];
 
     this._bind();
   }
@@ -97,8 +101,6 @@ export class Editor {
     this.btnZoomOut.addEventListener('click', () => this.zoomBy(1 / 1.2));
     this.btnLayerUp.addEventListener('click', () => this.moveSelected(+1));
     this.btnLayerDown.addEventListener('click', () => this.moveSelected(-1));
-    this.btnPlayPause.addEventListener('click', () => this.togglePlay());
-    this.btnSeekStart.addEventListener('click', () => this.seek(0));
     window.addEventListener('resize', () => {
       if (!this.isOpen()) return;
       if (this.zoomOverride === null) this.fitToView();
@@ -163,6 +165,9 @@ export class Editor {
   onSelectionChange(cb) { this._selectionListeners.push(cb); }
   onLayerUpdate(cb) { this._layerUpdateListeners.push(cb); }
   onCanvasUpdate(cb) { this._canvasUpdateListeners.push(cb); }
+  onTimeUpdate(cb) { this._timeUpdateListeners.push(cb); }
+  onPlayStateChange(cb) { this._playStateListeners.push(cb); }
+  onTrimChange(cb) { this._trimListeners.push(cb); }
 
   _emitSelection() {
     const layer = this.selectedId ? this.getLayer(this.selectedId) : null;
@@ -173,6 +178,52 @@ export class Editor {
   }
   _emitCanvasUpdate() {
     this._canvasUpdateListeners.forEach((cb) => cb());
+  }
+  _emitTimeUpdate() {
+    const primary = this.layers.find((l) => l.type === 'screen') || this.layers[0];
+    const rawCur = primary?.videoEl?.currentTime;
+    const cur = Number.isFinite(rawCur) ? rawCur : 0;
+    const dur = this.getDuration();
+    this._timeUpdateListeners.forEach((cb) => cb(cur, dur));
+  }
+  _emitPlayState() {
+    this._playStateListeners.forEach((cb) => cb(this.isPlaying));
+  }
+  _emitTrim() {
+    this._trimListeners.forEach((cb) => cb(this.trimIn, this.trimOut));
+  }
+
+  // 最少保留 0.5 秒有效区
+  setTrim(tIn, tOut) {
+    const dur = this.getDuration();
+    const MIN = 0.5;
+    let a = Math.max(0, Math.min(dur, tIn));
+    let b = Math.max(0, Math.min(dur, tOut));
+    if (b - a < MIN) {
+      // 保护最小间隔: 以变化量较大的一端为主, 另一端顶回来
+      if (Math.abs(a - this.trimIn) > Math.abs(b - this.trimOut)) b = Math.min(dur, a + MIN);
+      else a = Math.max(0, b - MIN);
+    }
+    this.trimIn = a;
+    this.trimOut = b;
+    // 把当前播放位置夹回有效区
+    const primary = this.layers.find((l) => l.type === 'screen') || this.layers[0];
+    const cur = primary?.videoEl?.currentTime || 0;
+    if (cur < this.trimIn || cur > this.trimOut) {
+      this.seek(Math.max(this.trimIn, Math.min(this.trimOut, cur)));
+    }
+    this._emitTrim();
+    this._emitTimeUpdate();
+  }
+
+  // MediaRecorder 生成的 webm 通常没写时长, video.duration 会是 Infinity —
+  // 必须退回到 session.durationMs, 否则时间轴刻度循环会炸。
+  getDuration() {
+    const primary = this.layers.find((l) => l.type === 'screen') || this.layers[0];
+    const d = primary?.videoEl?.duration;
+    if (Number.isFinite(d) && d > 0) return d;
+    if (this.session?.durationMs) return this.session.durationMs / 1000;
+    return 0;
   }
 
   isOpen() { return !this.root.classList.contains('hidden'); }
@@ -196,7 +247,13 @@ export class Editor {
     this.fitToView();
     this.renderLayerList();
     this.selectLayer(this.layers[this.layers.length - 1]?.id || null);
+    // 初始化 trim 到全片
+    this.trimIn = 0;
+    this.trimOut = this.getDuration();
     this._emitCanvasUpdate();
+    this._emitTrim();        // 先通知 trim 状态(避免 timeline 初次 render 把整条遮成黑)
+    this._emitTimeUpdate();  // 再通知时长/时间(这时会触发 timeline 按正确 trim 画遮罩)
+    this._emitPlayState();
   }
 
   close() {
@@ -360,7 +417,8 @@ export class Editor {
     const video = document.createElement('video');
     video.className = 'layer-content';
     video.src = opts.src;
-    video.muted = true;
+    // 屏幕轨道静音(避免和麦克风音轨撞声), 摄像头轨道保留口播声音
+    video.muted = opts.type === 'screen';
     video.playsInline = true;
     video.preload = 'auto';
     video.addEventListener('loadedmetadata', () => this._updatePlaybackTime());
@@ -662,27 +720,42 @@ export class Editor {
   }
 
   play() {
+    const primary = this.layers.find((l) => l.type === 'screen') || this.layers[0];
+    const cur = primary?.videoEl?.currentTime || 0;
+    // 播到末尾或落在修剪区外, 从 trimIn 起播
+    if (cur < this.trimIn - 0.01 || cur >= this.trimOut - 0.05) {
+      this.seek(this.trimIn);
+    }
     this.isPlaying = true;
-    this.btnPlayPause.textContent = '⏸';
     this.layers.forEach((l) => { l.videoEl.play().catch(() => {}); });
+    this._emitPlayState();
     this._startRAF();
   }
 
   pause() {
     this.isPlaying = false;
-    this.btnPlayPause.textContent = '▶';
     this.layers.forEach((l) => l.videoEl.pause());
+    this._emitPlayState();
     this._stopRAF();
   }
 
   seek(t) {
-    this.layers.forEach((l) => { try { l.videoEl.currentTime = t; } catch {} });
-    this._updatePlaybackTime();
+    const clamped = Math.max(this.trimIn, Math.min(this.trimOut, t));
+    this.layers.forEach((l) => { try { l.videoEl.currentTime = clamped; } catch {} });
+    this._emitTimeUpdate();
   }
 
   _startRAF() {
     if (this.rafId) return;
     const tick = () => {
+      // 到达 trimOut 自动停在尾端(不超出修剪区)
+      const primary = this.layers.find((l) => l.type === 'screen') || this.layers[0];
+      const cur = primary?.videoEl?.currentTime || 0;
+      if (this.isPlaying && this.trimOut > 0 && cur >= this.trimOut) {
+        this.pause();
+        this.seek(this.trimOut);
+        return;
+      }
       this._updatePlaybackTime();
       this.rafId = requestAnimationFrame(tick);
     };
@@ -694,18 +767,7 @@ export class Editor {
   }
 
   _updatePlaybackTime() {
-    const primary = this.layers.find((l) => l.type === 'screen') || this.layers[0];
-    if (!primary) return;
-    const cur = primary.videoEl.currentTime || 0;
-    const dur = primary.videoEl.duration || (this.session ? this.session.durationMs / 1000 : 0);
-    this.playbackTime.textContent = `${this._fmtTime(cur)} / ${this._fmtTime(dur)}`;
-  }
-
-  _fmtTime(s) {
-    if (!Number.isFinite(s)) return '00:00';
-    const m = Math.floor(s / 60).toString().padStart(2, '0');
-    const sec = Math.floor(s % 60).toString().padStart(2, '0');
-    return `${m}:${sec}`;
+    this._emitTimeUpdate();
   }
 
   _fmtDuration(ms) {

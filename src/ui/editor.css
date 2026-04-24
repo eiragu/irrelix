@@ -49,6 +49,38 @@
 .editor-export:active { transform: scale(0.97); }
 .editor-export:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* ========== 全局 Toast(6a) ========== */
+.toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: rgba(30, 35, 50, 0.95);
+  color: #fff;
+  font-size: 13px;
+  padding: 12px 18px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 300;
+  max-width: 340px;
+  line-height: 1.5;
+  backdrop-filter: blur(8px);
+  transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+  opacity: 1;
+  transform: translateX(0);
+}
+.toast.hidden {
+  opacity: 0;
+  transform: translateX(20px);
+  pointer-events: none;
+}
+.toast.success {
+  border-left: 3px solid #2ED573;
+}
+.toast.error {
+  border-left: 3px solid #FF4757;
+}
+
 /* ========== 导出对话框(5a) ========== */
 .export-dialog {
   position: fixed;

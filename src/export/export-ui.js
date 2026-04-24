@@ -4,13 +4,15 @@
  * 点"导出视频" → 弹对话框 → 进度 → 保存到本地。
  * 支持取消(直接关对话框, pipeline 自己停)。
  */
-import { exportSession, pickEngineSync } from './exporter.js';
+import { exportSession, pickEngineSync, prewarmEngine } from './exporter.js';
+import { showToast } from '../ui/toast.js';
 
 const STAGE_LABELS = {
   'preparing': '准备音视频输入…',
   'recording': '实时合成录制中',
   'encoding': '编码中',
   'done': '完成',
+  'fallback-to-mediarecorder': 'WebCodecs 出错, 自动切到 MediaRecorder 重试…',
 };
 
 const ENGINE_LABELS = {
@@ -38,6 +40,9 @@ export class ExportUI {
     this.btnExport.addEventListener('click', () => this.start());
     this.btnCancel.addEventListener('click', () => this.cancel());
     this.btnSave.addEventListener('click', () => this.save());
+
+    // 预热: app 加载时就探测一次, 不等用户点击导出, ETA 更准
+    prewarmEngine();
   }
 
   cancel() {
@@ -176,6 +181,7 @@ export class ExportUI {
         await w.write(this.resultBlob);
         await w.close();
         this.close();
+        showToast(`已保存 ${handle.name}`, { kind: 'success' });
         return;
       }
     } catch (e) {
@@ -191,6 +197,7 @@ export class ExportUI {
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
     this.close();
+    showToast(`已下载 ${name}（看浏览器下载栏）`, { kind: 'success' });
   }
 
   _fmtSize(b) {

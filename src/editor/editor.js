@@ -11,6 +11,7 @@
  */
 
 import { LAYOUT_PRESETS, computeLayout, getDefaultLayoutKey } from './layouts.js';
+import { loadPrefs, savePrefs } from './prefs.js';
 
 const HANDLE_POSITIONS = ['tl', 'tm', 'tr', 'ml', 'mr', 'bl', 'bm', 'br'];
 
@@ -81,6 +82,17 @@ export class Editor {
     this.trimOut = 0; // open 时初始化为 duration
 
     this.canvasBg = { type: 'color', color: '#000000' };
+
+    // 应用持久化偏好(上次用的画布尺寸/底色), 第一次打开时什么都没存
+    const prefs = loadPrefs();
+    if (prefs?.canvasW && prefs?.canvasH) {
+      this.canvasW = prefs.canvasW;
+      this.canvasH = prefs.canvasH;
+    }
+    if (prefs?.canvasBg) {
+      this.canvasBg = { ...this.canvasBg, ...prefs.canvasBg };
+    }
+    this._prefsLayoutKey = prefs?.layoutKey || null;
 
     this._onCloseCallbacks = [];
     this._selectionListeners = [];
@@ -159,6 +171,7 @@ export class Editor {
       this._emitLayerUpdate(layer);
     });
     this.renderLayerList();
+    savePrefs({ layoutKey: key });
   }
 
   onClose(cb) { this._onCloseCallbacks.push(cb); }
@@ -241,7 +254,8 @@ export class Editor {
     // 初始化时就应用默认布局,不是居中占位(懒人模式)
     this.stage.style.width = `${this.canvasW}px`;
     this.stage.style.height = `${this.canvasH}px`;
-    const initKey = getDefaultLayoutKey(this.canvasW, this.canvasH);
+    // 优先用上次存的布局 key, 否则按画布尺寸挑默认
+    const initKey = this._prefsLayoutKey || getDefaultLayoutKey(this.canvasW, this.canvasH);
     this.applyLayout(initKey);
     this._applyCanvasBg();
     this.fitToView();
@@ -288,6 +302,7 @@ export class Editor {
     else this._applyScale(this.zoomOverride);
     this._updateCanvasInfo();
     this._emitCanvasUpdate();
+    savePrefs({ canvasW: w, canvasH: h });
   }
 
   _reflowLayers(oldW, oldH) {
@@ -350,6 +365,7 @@ export class Editor {
     Object.assign(this.canvasBg, bg);
     this._applyCanvasBg();
     this._emitCanvasUpdate();
+    savePrefs({ canvasBg: { ...this.canvasBg } });
   }
 
   _applyCanvasBg() {

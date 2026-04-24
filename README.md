@@ -1,22 +1,15 @@
 # 画布 luping
 
-> GitHub 仓库 slug:`luping`(录屏拼音)。产品对外名称仍是"画布"。
+> 给中国内容创作者的**自由画幅录屏工具**。录一次屏 → 画布里自由编辑 → 按不同平台画幅一键导出多版本。
 
-给中国内容创作者的自由画幅录屏工具。录一次,自由编辑,多画幅导出,每个平台一键成片。
+- GitHub slug：`luping`（"录屏"拼音）
+- 产品名：**画布**
+- 定位：Loom / OBS / 剪映 / Opus Clip 的平替，但**只做"录屏 + 轻量自由画布"闭环**
+- 特点：**纯前端零服务费**，视频从不上传，你的原始录制永远只在你自己电脑上
 
-## 当前版本
+---
 
-**v2-step-4c**:画布编辑器(4a 骨架 · 4b 属性面板 · 4c 快速布局)。4d 时间轴待做,然后第五步 ffmpeg 导出。
-
-## 技术栈
-
-- **前端**:Vite 5 + 原生 ES Module + 纯前端(无后端)
-- **采集**:MediaRecorder API / getDisplayMedia / getUserMedia
-- **存储**:IndexedDB(两路原始视频 blob 独立持久化)
-- **导出**:ffmpeg.wasm 0.12.x(第五步加入)
-- **部署**:Vercel(配 COOP/COEP 头启用 SharedArrayBuffer 多线程)
-
-## 开发
+## 快速体验（本地跑）
 
 ```bash
 pnpm install
@@ -24,122 +17,108 @@ pnpm dev
 # 浏览器打开 http://localhost:5173
 ```
 
+首次打开会要摄像头权限。建议用 Chrome 或 Edge。
+
+## 功能清单
+
+### 录制
+- 屏幕 + 摄像头 **双轨分离录制**（两路独立 MediaRecorder），原始素材保留在 IndexedDB
+- 录完保留原始文件，不做任何有损操作
+- 本地存储配额实时可见
+
+### 画布编辑
+- 画布尺寸：**4 个常用画幅**（横 16:9 / 竖 9:16 / 竖 3:4 / 竖 4:5）
+- **懒人模式**：切画布尺寸自动应用推荐布局
+- **8 个快速布局**：全屏 / 上屏下人 / 下屏上人 / 左屏右人 / 右屏左人 / 画中画居中 / 仅屏幕 / 仅摄像头
+- **图层自由调整**：拖拽 + 8 控制点缩放 + Shift 等比
+- **摄像头样式**：圆形 / 正方形 / 圆角矩形 + 镜像 + 边框 + 透明度
+- **画面裁切**（pan/zoom）：在摄像头外框内部平移缩放视频内容，可把脸放到中心、避开背景杂物（v1.0 下 AI 抠图的替代方案）
+- **底部时间轴**：刻度 / 双轨色块 / 红色播放头 + 拖动 scrub / 空格播放 / 方向键微调
+- **片段修剪**：两端黄色手柄拖动裁掉开头废话和结尾收尾，被裁区半透明遮罩
+- **偏好记忆**：画布尺寸 / 底色 / 默认布局自动记到 localStorage，下次打开自动复用
+
+### 导出
+- **WebCodecs 硬件加速**：H.264 + AAC → mp4，10 秒视频约 5-7 秒出结果（**2x 加速**）
+- **MediaRecorder 兜底**：浏览器不支持 WebCodecs 时自动退到 webm 实时录制
+- **失败自动回落**：WebCodecs 运行中出错，自动切 MediaRecorder 重试，用户无感
+- `showSaveFilePicker` 保存，不支持降级 `<a download>`
+
+## 技术栈
+
+- **前端**：Vite 5 + 原生 ES Module，无框架
+- **采集**：`getDisplayMedia` + `getUserMedia` + `MediaRecorder`（VP9+Opus）
+- **存储**：IndexedDB（两路原始视频 blob 独立存）
+- **合成**：Canvas 2D（`drawImage` + clip + transform，`object-fit: cover`）
+- **编码**：
+  - 主路径：`VideoEncoder` + `AudioEncoder`（WebCodecs 硬件加速）
+  - 兜底：`canvas.captureStream()` + `MediaRecorder`
+- **封装**：`mp4-muxer`（JS 库，0 编码开销）
+- **部署**：Vercel（`vercel.json` 配 COOP/COEP 头启用 SharedArrayBuffer）
+
+## 部署到 Vercel
+
+本项目已在 `vercel.json` 里配好 COOP/COEP 头（WebCodecs 多线程 / SharedArrayBuffer 必需）。
+
+```bash
+# 方式 A: Vercel CLI
+npx vercel           # 第一次会交互式登录 + 初始化
+npx vercel --prod    # 正式部署
+
+# 方式 B: GitHub 集成
+# 推 luping 仓库到 GitHub 后, 在 vercel.com 导入仓库, 全程自动。
+```
+
+**注意**：不能用 GitHub Pages —— 它不支持自定义 header，`SharedArrayBuffer` 跑不起来。
+
 ## 目录结构
 
 ```
 src/
-  capture/    录制模块
-    recorder.js        双轨录制(屏幕 + 摄像头)
-  storage/    存储封装
-    db.js              IndexedDB sessions CRUD
-  editor/     画布编辑器
-    editor.js          画布 + 图层拖拽缩放 + 播放
-    panel.js           右侧三 Tab 属性面板
-    layouts.js         8 个快速布局预设(纯函数)
-  export/     导出模块(第五步加入)
-  ui/         界面样式
-    style.css          主录制界面
-    editor.css         编辑器界面
-  main.js     入口,接线录制 + 编辑器
-public/       静态资源
-docs/         项目文档
+  capture/recorder.js          双轨录制 + mimeType 探测
+  storage/db.js                IndexedDB sessions CRUD
+  editor/
+    editor.js                  画布、图层、播放
+    panel.js                   右侧三 Tab 属性面板
+    layouts.js                 8 个快速布局预设
+    timeline.js                底部时间轴 + 修剪
+    prefs.js                   localStorage 偏好
+  export/
+    exporter.js                路由 + 能力检测 + 自动回落
+    canvas-renderer.js         渲染一帧(B 和 C 共享)
+    webcodecs-pipeline.js      H.264 + AAC → mp4
+    recorder-pipeline.js       canvas.captureStream → webm
+    export-ui.js               导出对话框
+  ui/
+    style.css, editor.css, toast.js
+  main.js                      入口
+public/                        静态资源
+docs/技术可行性报告.md
 ```
-
-## 文档
-
-- [技术可行性报告](docs/技术可行性报告.md)
-
----
-
-## 已实现功能
-
-### 第一步 · 技术可行性确认 ✅
-- 核心 API 全部验证通过:并行屏幕+摄像头采集 / 双轨 MediaRecorder / ffmpeg.wasm 多线程合成 / File System Access 降级 / IndexedDB 配额
-- 关键约束:ffmpeg.wasm 多线程需要 COOP/COEP 头,不能用 `file://` 本地打开,必须 HTTPS 部署
-
-### 第二步 · 骨架 + 最小录屏链路 ✅
-- Vite 项目骨架,`src/` 按模块拆分
-- `vite-plugin-cross-origin-isolation` 自动注入 COOP/COEP
-- `vercel.json` 预留部署配置
-- 最小验证:按钮点击 → `getDisplayMedia` → MediaRecorder 录 10 秒 → 预览 + 下载 webm
-
-### 第三步 · 双轨录制 + IndexedDB ✅
-- 页面加载请求摄像头权限(持久化)
-- 点"开始录屏"弹屏幕选择,屏幕 + 摄像头**两个 MediaRecorder 并行**
-- 两路 blob **独立存入 IndexedDB**(为后期自由合成保留原始高清素材)
-- "最近录制"列表:两路视频独立回放、删除、刷新保留
-- 存储配额实时显示
-
-### 第四步 · 画布编辑器
-
-#### 4a · 基础骨架 ✅
-- 全屏编辑器视图,三栏布局:左图层列表 / 中画布 / 右属性面板
-- 画布坐标系:真实像素(如 1080×1920)+ CSS scale 适应屏幕
-- 画布尺寸可切换,**懒人模式**:切尺寸自动应用推荐默认布局
-- 两个默认图层(屏幕 + 摄像头),可自由拖拽、8 控制点缩放、Shift 等比
-- 图层列表:选中、显示/隐藏、锁定、置上/置下
-- 简易同步播放、回到开头、计时器显示
-
-#### 4b · 属性面板 ✅
-- 右侧三 Tab:画布 / 屏幕 / 摄像头,选图层自动切 Tab
-- **Tab 1 画布**:尺寸预设 + 底色(纯色 HEX + 色板 + 透明棋盘)
-- **Tab 2 屏幕**:X/Y/宽/高、等比锁定、形状(矩形/圆角矩形)、圆角、边框、透明度、置顶/置底
-- **Tab 3 摄像头**:以上全部 + 形状(圆形/正方形/圆角矩形)+ 镜像翻转 + **画面裁切(pan/zoom)**
-- **画面裁切**是 4b 的亮点 —— 用户能在摄像头外框内部平移+放大视频内容,把脸放到中心、放大避开背景杂物。这是 v1.0 下替代"AI 抠图"的实用近似方案(AI 抠图仍放 v2)
-
-#### 4c · 快速布局 + 画布尺寸优化 ✅
-- 画布工作台顶部"**快速布局 ▾**"下拉,8 个预设:
-  - 全屏 · 上屏下人 · 下屏上人 · 左屏右人 · 右屏左人 · 画中画居中 · 仅屏幕 · 仅摄像头
-- **懒人模式**:切画布尺寸自动应用推荐布局(所有尺寸统一用"全屏 + 圆形头像右下角")
-- 画布尺寸精简到 4 个(**符合自媒体实际场景**):
-  - **横 16:9**(1920×1080):YouTube / B站 / 公众号
-  - **竖 9:16**(1080×1920):抖音 / 小红书视频 / 视频号 / Reels / TikTok
-  - **竖 3:4**(1080×1440):小红书图文 / 公众号封面
-  - **竖 4:5**(1080×1350):Instagram Feed
-  - ~~横 4:3~~(已移除 — 自媒体平台基本不用)
-  - ~~方 1:1~~(已移除)
-- 默认摄像头:**画布长边 × 18%**(横屏窄画布头像会自然缩小,避免显得挤)
-- 头像位置:竖屏不贴底(距底部 10% 画布高度),大约在画布 72% 高度位置
-- 摄像头 Tab 顶部紫色提示:告诉用户如何改大小、用画面裁切
-
-#### 4d · 时间轴(待做)⏳
-- 裁掉开头结尾的废话
-- 删除中间段(split + delete)
-- 预览播放刷子(scrubber)
-
-### 第五步 · ffmpeg.wasm 导出 ⏳
-
-按画布里编辑好的布局/样式合成 MP4(H.264 + AAC)。5 分钟素材导出约 3-5 分钟(多线程)。
-
-### 第六步 · 体验打磨 ⏳
-
-导出进度条 / 错误兜底 / 首次 onboarding / Chrome Edge Safari 兼容测试。
-
----
 
 ## 核心设计原则
 
-1. **画布是自由创作空间,不是模板选择器** — 预设是起点,不是终点,用户永远能继续调
-2. **双轨分离录制** — 屏幕和摄像头是两路独立原始素材,编辑和导出时才合成,保证画质
-3. **v1.0 明确不做** — AI 抠图、人脸跟随、批量导出、自动字幕、云存储、团队协作,都推到 v2
-4. **技术栈选型保守** — 用成熟的 Vite + ffmpeg.wasm 0.12.x,不追新框架
-
-## 已知限制
-
-- 仅桌面 Chrome / Edge 体验最佳,Safari 部分降级,Firefox 不支持保存(需降级用户 `<a download>`)
-- ffmpeg.wasm 有 **2GB WASM 内存墙**,单次导出源素材建议 ≤ 500MB(约 15 分钟 1080p)
-- 录制时长软上限 10-15 分钟,超长素材 v2 用 WebCodecs 流式处理
+1. **画布是自由创作空间，不是模板选择器** —— 预设是起点不是终点
+2. **双轨分离录制** —— 原始素材保留，编辑时才合成
+3. **v1.0 明确不做**：AI 抠图、人脸跟随、批量导出、自动字幕、云存储、团队协作
+4. **零服务成本** —— 所有合成和编码发生在浏览器，你不为视频转码付任何 API 费
 
 ## 进度
 
 - [x] 第一步 · 技术可行性确认
-- [x] 第二步 · 骨架 + 最小录屏链路(tag `v2-step-2`)
-- [x] 第三步 · 双轨录制 + IndexedDB(tag `v2-step-3`)
-- [ ] 第四步 · 画布编辑器
-  - [x] 4a 基础骨架
-  - [x] 4b 属性面板(含画面裁切)
-  - [x] 4c 快速布局 + 画布尺寸优化
-  - [ ] 4d 时间轴 ← **下一步**
-  - 完成后打 tag `v2-step-4`
-- [ ] 第五步 · ffmpeg.wasm 导出管线
-- [ ] 第六步 · 体验打磨 + 跨浏览器兼容
+- [x] 第二步 · 骨架 + 最小录屏链路 （tag `v2-step-2`）
+- [x] 第三步 · 双轨录制 + IndexedDB （tag `v2-step-3`）
+- [x] 第四步 · 画布编辑器（4a 骨架 / 4b 属性面板 / 4c 快速布局 / 4d 时间轴 + 修剪）（tag `v2-step-4`）
+- [x] 第五步 · 导出视频（canvas + WebCodecs / MediaRecorder）（tag `v2-step-5`）
+- [x] 第六步 6a · 体验打磨（自动回落 / 偏好记忆 / toast / 预热）
+- [ ] 第六步 6b · 部署上线 + 跨浏览器测试 ← **当前**
+
+## 已知限制
+
+- 仅桌面 Chrome / Edge 体验最佳
+- Safari 部分降级（无 WebCodecs 走 MediaRecorder 输出 webm）
+- Firefox 不支持 `showSaveFilePicker` 降级用浏览器下载栏
+- 录制时长建议 ≤ 15 分钟（浏览器内存）
+
+## License
+
+MIT

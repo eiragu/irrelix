@@ -1,8 +1,9 @@
-# 画布 luping
+# 画布 irrelix
 
 > 给中国内容创作者的**自由画幅录屏工具**。录一次屏 → 画布里自由编辑 → 按不同平台画幅一键导出多版本。
 
-- GitHub slug：`luping`（"录屏"拼音）
+- GitHub 仓库：[eiragu/irrelix](https://github.com/eiragu/irrelix)
+- 线上地址：[irrelix.com](https://irrelix.com)（部署中）
 - 产品名：**画布**
 - 定位：Loom / OBS / 剪映 / Opus Clip 的平替，但**只做"录屏 + 轻量自由画布"闭环**
 - 特点：**纯前端零服务费**，视频从不上传，你的原始录制永远只在你自己电脑上
@@ -55,20 +56,78 @@ pnpm dev
 - **封装**：`mp4-muxer`（JS 库，0 编码开销）
 - **部署**：Vercel（`vercel.json` 配 COOP/COEP 头启用 SharedArrayBuffer）
 
-## 部署到 Vercel
+## 部署到 Vercel + Cloudflare（irrelix.com）
 
-本项目已在 `vercel.json` 里配好 COOP/COEP 头（WebCodecs 多线程 / SharedArrayBuffer 必需）。
+> 技术栈定了：**Vercel（托管 + 自动 HTTPS）** + **Cloudflare（域名 DNS）**。
+> `vercel.json` 已经配好 COOP/COEP 头（WebCodecs / SharedArrayBuffer 必需），直接部署即可。
+> `.com` 国际域名 → **不需要 ICP 备案**。
+
+### 第一步 · Vercel 导入仓库
+
+1. 打开 https://vercel.com/signup → 点 **"Continue with GitHub"**
+2. 用 **eiragu** 账号授权
+3. Dashboard → **"Add New → Project"**
+4. 找到 `eiragu/irrelix` → **Import**
+5. 默认配置全部保留（`vercel.json` 已经写好 build / COOP/COEP）→ 点 **Deploy**
+6. 1-2 分钟构建完 → 得到 `irrelix-xxx.vercel.app` 临时地址
+
+**⚠️ 先在临时地址上验证录屏 + 导出 mp4 都正常，再进第二步。** 不行说明 COOP/COEP 头没生效，要先查 Vercel 的 Deployment → Headers 再继续。
+
+### 第二步 · Vercel 绑域名
+
+1. 项目页 → **Settings → Domains**
+2. 输入 `irrelix.com` → **Add**
+3. 再加 `www.irrelix.com` → **Add**（选 "Redirect to irrelix.com"）
+4. Vercel 给出要添加的 DNS 记录，通常是：
+   ```
+   A      @      76.76.21.21
+   CNAME  www    cname.vercel-dns.com
+   ```
+   （记下 Vercel 实际给的值，可能不同。）
+
+### 第三步 · Cloudflare 配 DNS
+
+1. 登录 Cloudflare → 选 `irrelix.com` → 左侧 **DNS → Records**
+2. **删掉** Cloudflare 自动生成的 `A @` / `CNAME www` 等旧记录
+3. **添加 A 记录**：
+   - Type: `A`
+   - Name: `@`
+   - IPv4: `76.76.21.21`（按第二步 Vercel 给的为准）
+   - Proxy status: **DNS only（灰云）** ← 关键
+4. **添加 CNAME**：
+   - Type: `CNAME`
+   - Name: `www`
+   - Target: `cname.vercel-dns.com`
+   - Proxy status: **DNS only（灰云）** ← 关键
+5. Save
+
+**⚠️ 必须关闭橙云代理（Proxy）**：Cloudflare 代理默认会缓存/改写响应头，可能破坏 `Cross-Origin-Embedder-Policy: require-corp`，导致 `SharedArrayBuffer` 失效、WebCodecs 编码挂。以后想加 CDN 再单独调。
+
+### 第四步 · 验证上线
+
+- 回 Vercel Domains 页面：状态 `Invalid Configuration → Valid Configuration`，HTTPS 证书 Vercel 自动签
+- 浏览器打开 `https://irrelix.com`，看到录屏工具即成功
+- F12 → Network → 主文档 → Response Headers，确认有：
+  - `cross-origin-opener-policy: same-origin`
+  - `cross-origin-embedder-policy: require-corp`
+- 再录一段、导出一个 mp4，完成
+
+### 不要用的方案
+
+- ❌ **GitHub Pages** —— 不支持自定义 header，`SharedArrayBuffer` 跑不起来
+- ❌ **Cloudflare Pages** —— 同样问题；且橙云代理对 COEP 兼容性不稳
+- ❌ **Cloudflare 橙云 + Vercel 回源** —— 头可能被改，录屏/编码概率性挂
+
+### 备选：Vercel CLI 本地部署（可选）
+
+不走 GitHub 集成，也可以本机推：
 
 ```bash
-# 方式 A: Vercel CLI
-npx vercel           # 第一次会交互式登录 + 初始化
+npx vercel           # 第一次交互式登录 + 初始化
 npx vercel --prod    # 正式部署
-
-# 方式 B: GitHub 集成
-# 推 luping 仓库到 GitHub 后, 在 vercel.com 导入仓库, 全程自动。
 ```
 
-**注意**：不能用 GitHub Pages —— 它不支持自定义 header，`SharedArrayBuffer` 跑不起来。
+但推荐用 GitHub 集成，以后 `git push` 会自动触发部署。
 
 ## 目录结构
 
@@ -110,7 +169,8 @@ docs/技术可行性报告.md
 - [x] 第四步 · 画布编辑器（4a 骨架 / 4b 属性面板 / 4c 快速布局 / 4d 时间轴 + 修剪）（tag `v2-step-4`）
 - [x] 第五步 · 导出视频（canvas + WebCodecs / MediaRecorder）（tag `v2-step-5`）
 - [x] 第六步 6a · 体验打磨（自动回落 / 偏好记忆 / toast / 预热）
-- [ ] 第六步 6b · 部署上线 + 跨浏览器测试 ← **当前**
+- [ ] 第六步 6b · 部署上线 irrelix.com（Vercel + Cloudflare，流程见"部署到 Vercel"章节）← **当前**
+- [ ] 第六步 6c · 跨浏览器测试（Chrome / Edge / Safari / Firefox）
 
 ## 已知限制
 

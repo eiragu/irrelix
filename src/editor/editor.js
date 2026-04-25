@@ -12,6 +12,7 @@
 
 import { LAYOUT_PRESETS, computeLayout, getDefaultLayoutKey } from './layouts.js';
 import { loadPrefs, savePrefs } from './prefs.js';
+import { getFilterString } from '../capture/beauty.js';
 
 const HANDLE_POSITIONS = ['tl', 'tm', 'tr', 'ml', 'mr', 'bl', 'bm', 'br'];
 
@@ -520,6 +521,7 @@ export class Editor {
       const ty = (layer.contentOffsetY ?? 0) * 100 * tySign;
       layer.videoEl.style.transform = `translate(${tx}%, ${ty}%) scale(${sx}, ${sy})`;
       layer.videoEl.style.transformOrigin = 'center center';
+      layer.videoEl.style.filter = getFilterString();
     }
 
     layer.el.classList.toggle('locked', layer.locked);

@@ -6,12 +6,14 @@
  *   - 画布背景色/透明
  *   - 每个可见图层按 x/y/w/h 定位, object-fit: cover 填满
  *   - screen: rectangle 或 rounded(带 radius)
- *   - cam: circle / square / rectangle(带 radius)
+ *   - cam: circle / square / rectangle(带 radius), 应用美颜 filter
  *   - 镜像: flipH / flipV
  *   - 边框: inset stroke
  *   - cam 内裁切: contentScale + contentOffsetX/Y
  *   - opacity
  */
+
+import { getFilterString } from '../capture/beauty.js';
 
 export function renderFrame(ctx, editorState, videoMap) {
   const { canvasW, canvasH, canvasBg, layers } = editorState;
@@ -40,6 +42,11 @@ function drawLayer(ctx, layer, source) {
 
   ctx.save();
   ctx.globalAlpha = opacity;
+
+  // 摄像头层应用美颜滤镜(亮度/对比度/饱和度/暖色)
+  if (layer.type === 'cam') {
+    ctx.filter = getFilterString();
+  }
 
   // 形状裁剪 (画图像时约束到此路径内)
   const clipRadius = resolveRadius(layer);

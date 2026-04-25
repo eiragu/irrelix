@@ -18,6 +18,17 @@ import { Editor } from './editor/editor.js';
 import { Panel } from './editor/panel.js';
 import { Timeline } from './editor/timeline.js';
 import { ExportUI } from './export/export-ui.js';
+import {
+  beauty,
+  PRESETS,
+  setBeauty,
+  loadBeauty,
+  resetBeauty,
+  applyPreset,
+  getActivePresetKey,
+  getFilterString,
+} from './capture/beauty.js';
+import { loadPrefs, savePrefs } from './editor/prefs.js';
 
 const appRoot = document.querySelector('.app');
 const editor = new Editor();
@@ -103,6 +114,83 @@ async function initCamera() {
     btnStart.disabled = false;
     return false;
   }
+}
+
+function applyBeautyToPreview() {
+  if (camPreview) camPreview.style.filter = getFilterString();
+}
+
+function initBeautyControls() {
+  loadBeauty(loadPrefs()?.beauty);
+  applyBeautyToPreview();
+
+  const sliders = [
+    { id: 'beautyBrightness', key: 'brightness', fmt: (v) => `${Math.round(v * 100)}%` },
+    { id: 'beautyContrast',   key: 'contrast',   fmt: (v) => `${Math.round(v * 100)}%` },
+    { id: 'beautySaturate',   key: 'saturate',   fmt: (v) => `${Math.round(v * 100)}%` },
+    { id: 'beautyHueRotate',  key: 'hueRotate',  fmt: (v) => `${v > 0 ? '+' : ''}${v}°` },
+  ];
+
+  function syncSliders() {
+    for (const { id, key, fmt } of sliders) {
+      const slider = $(id);
+      const val = $(id + 'Val');
+      if (slider) slider.value = beauty[key];
+      if (val) val.textContent = fmt(beauty[key]);
+    }
+  }
+
+  function syncPresetActive() {
+    const active = getActivePresetKey();
+    document.querySelectorAll('.preset-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.preset === active);
+    });
+  }
+
+  function persist() {
+    savePrefs({ beauty: { ...beauty } });
+  }
+
+  // 滑块事件
+  for (const { id, key, fmt } of sliders) {
+    const slider = $(id);
+    const val = $(id + 'Val');
+    if (!slider) continue;
+    slider.addEventListener('input', () => {
+      const v = Number(slider.value);
+      setBeauty({ [key]: v });
+      val.textContent = fmt(v);
+      applyBeautyToPreview();
+      syncPresetActive();
+      persist();
+    });
+  }
+
+  // 预设按钮
+  document.querySelectorAll('.preset-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      applyPreset(btn.dataset.preset);
+      syncSliders();
+      applyBeautyToPreview();
+      syncPresetActive();
+      persist();
+    });
+  });
+
+  // 重置按钮
+  const resetBtn = $('beautyReset');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      resetBeauty();
+      syncSliders();
+      applyBeautyToPreview();
+      syncPresetActive();
+      persist();
+    });
+  }
+
+  syncSliders();
+  syncPresetActive();
 }
 
 async function updateStorageInfo() {
@@ -320,6 +408,7 @@ async function init() {
 
   setStatus('请求摄像头授权…首次使用浏览器会询问权限。');
   await initCamera();
+  initBeautyControls();
   await requestPersistent();
   await updateStorageInfo();
   await refreshSessionsList();

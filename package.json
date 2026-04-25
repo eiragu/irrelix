@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "画布 · 给中国内容创作者的自由画幅录屏工具",
+  "description": "录一下 · 给创作者的免费录屏工具",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

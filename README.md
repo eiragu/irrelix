@@ -1,10 +1,10 @@
-# 画布 irrelix
+# 录一下
 
-> 给中国内容创作者的**自由画幅录屏工具**。录一次屏 → 画布里自由编辑 → 按不同平台画幅一键导出多版本。
+> 给创作者的**免费录屏工具**。录一次屏 → 自由画幅编辑 → 按不同平台一键导出多版本。
 
-- GitHub 仓库：[eiragu/irrelix](https://github.com/eiragu/irrelix)
-- 线上地址：[irrelix.com](https://irrelix.com)（部署中）
-- 产品名：**画布**
+- GitHub 仓库：[eiragu/irrelix](https://github.com/eiragu/irrelix)（仓库代号沿用 irrelix）
+- 线上地址：[irrelix.com](https://irrelix.com)
+- 产品名：**录一下**
 - 定位：Loom / OBS / 剪映 / Opus Clip 的平替，但**只做"录屏 + 轻量自由画布"闭环**
 - 特点：**纯前端零服务费**，视频从不上传，你的原始录制永远只在你自己电脑上
 

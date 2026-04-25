@@ -166,7 +166,7 @@ export class ExportUI {
     const ts = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     const ext = this.resultExt || 'webm';
-    const name = `画布_${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}.${ext}`;
+    const name = `录一下_${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}.${ext}`;
 
     try {
       if ('showSaveFilePicker' in window) {

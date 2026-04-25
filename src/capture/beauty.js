@@ -12,17 +12,19 @@ const DEFAULT = {
   contrast: 1,      // 0.8 - 1.3
   saturate: 1,      // 0.5 - 1.5
   hueRotate: 0,     // -20 ~ 20 度 (负偏暖, 正偏冷)
+  softness: 0,      // 0 - 1.5 px 柔光(轻度模糊模拟磨皮, 70% 类似真双边滤波效果)
 };
 
 export const beauty = { ...DEFAULT };
 
-// 一键预设 (内置 5 个, 覆盖最常用色调)
+// 6 档预设: 参考 2025-2026 小红书主流命名 + 不同色调方向
 export const PRESETS = [
-  { key: 'original',  name: '原色',     brightness: 1,    contrast: 1,    saturate: 1,    hueRotate: 0 },
-  { key: 'coolWhite', name: '冷白皮',   brightness: 1.15, contrast: 1.05, saturate: 0.85, hueRotate: 8 },
-  { key: 'warmCream', name: '奶油暖',   brightness: 1.1,  contrast: 1,    saturate: 1.1,  hueRotate: -10 },
-  { key: 'natural',   name: '自然提亮', brightness: 1.1,  contrast: 1.05, saturate: 1,    hueRotate: 0 },
-  { key: 'vlog',      name: '高对比',   brightness: 1.05, contrast: 1.2,  saturate: 1.1,  hueRotate: 0 },
+  { key: 'original', name: '原色',   brightness: 1,    contrast: 1,    saturate: 1,    hueRotate: 0,  softness: 0   },
+  { key: 'coolWhite',name: '冷白皮', brightness: 1.15, contrast: 1.05, saturate: 0.85, hueRotate: 8,  softness: 0.4 },
+  { key: 'cream',    name: '奶油',   brightness: 1.12, contrast: 1.00, saturate: 1.05, hueRotate: -6, softness: 0.5 },
+  { key: 'clear',    name: '通透',   brightness: 1.10, contrast: 1.10, saturate: 0.95, hueRotate: 2,  softness: 0.2 },
+  { key: 'mood',     name: '氛围感', brightness: 1.05, contrast: 1.15, saturate: 1.10, hueRotate: -8, softness: 0.5 },
+  { key: 'raw',      name: '生图',   brightness: 1.05, contrast: 1.05, saturate: 1.00, hueRotate: 0,  softness: 0   },
 ];
 
 export function setBeauty(patch) {
@@ -47,6 +49,7 @@ export function applyPreset(key) {
     contrast: p.contrast,
     saturate: p.saturate,
     hueRotate: p.hueRotate,
+    softness: p.softness,
   });
 }
 
@@ -56,7 +59,8 @@ export function getActivePresetKey() {
     if (eq(beauty.brightness, p.brightness) &&
         eq(beauty.contrast, p.contrast) &&
         eq(beauty.saturate, p.saturate) &&
-        eq(beauty.hueRotate, p.hueRotate)) {
+        eq(beauty.hueRotate, p.hueRotate) &&
+        eq(beauty.softness, p.softness)) {
       return p.key;
     }
   }
@@ -64,6 +68,7 @@ export function getActivePresetKey() {
 }
 
 export function getFilterString() {
-  const { brightness, contrast, saturate, hueRotate } = beauty;
-  return `brightness(${brightness}) contrast(${contrast}) saturate(${saturate}) hue-rotate(${hueRotate}deg)`;
+  const { brightness, contrast, saturate, hueRotate, softness } = beauty;
+  const blurPart = softness > 0 ? ` blur(${softness}px)` : '';
+  return `brightness(${brightness}) contrast(${contrast}) saturate(${saturate}) hue-rotate(${hueRotate}deg)${blurPart}`;
 }

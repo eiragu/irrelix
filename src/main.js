@@ -129,6 +129,7 @@ function initBeautyControls() {
     { id: 'beautyContrast',   key: 'contrast',   fmt: (v) => `${Math.round(v * 100)}%` },
     { id: 'beautySaturate',   key: 'saturate',   fmt: (v) => `${Math.round(v * 100)}%` },
     { id: 'beautyHueRotate',  key: 'hueRotate',  fmt: (v) => `${v > 0 ? '+' : ''}${v}°` },
+    { id: 'beautySoftness',   key: 'softness',   fmt: (v) => v.toFixed(1) },
   ];
 
   function syncSliders() {

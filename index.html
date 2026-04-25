@@ -57,9 +57,10 @@
         <div class="beauty-presets" id="beautyPresets">
           <button class="preset-btn" data-preset="original">原色</button>
           <button class="preset-btn" data-preset="coolWhite">冷白皮</button>
-          <button class="preset-btn" data-preset="warmCream">奶油暖</button>
-          <button class="preset-btn" data-preset="natural">自然提亮</button>
-          <button class="preset-btn" data-preset="vlog">高对比</button>
+          <button class="preset-btn" data-preset="cream">奶油</button>
+          <button class="preset-btn" data-preset="clear">通透</button>
+          <button class="preset-btn" data-preset="mood">氛围感</button>
+          <button class="preset-btn" data-preset="raw">生图</button>
         </div>
         <div class="beauty-grid">
           <label class="beauty-row">
@@ -81,6 +82,11 @@
             <span class="beauty-label">暖色</span>
             <input type="range" id="beautyHueRotate" min="-20" max="20" step="1" value="0">
             <span class="beauty-val" id="beautyHueRotateVal">0°</span>
+          </label>
+          <label class="beauty-row">
+            <span class="beauty-label">磨皮</span>
+            <input type="range" id="beautySoftness" min="0" max="1.5" step="0.1" value="0">
+            <span class="beauty-val" id="beautySoftnessVal">0</span>
           </label>
         </div>
       </div>

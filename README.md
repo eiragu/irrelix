@@ -5,7 +5,7 @@
 
 **🌐 在线使用：[irrelix.com](https://irrelix.com)**
 
-*English TL;DR: **irrelix** is a free, single-file, browser-based screen recorder for creators — screen + webcam overlay composited in real time (WYSIWYG), beauty filters, green screen, teleprompter, multiple aspect ratios (16:9 / 9:16 / 1:1 …), exports mp4/webm. 100% client-side: no install, no signup, no backend, nothing ever uploaded. The entire product is one self-contained HTML file ([`screencap/index.html`](screencap/index.html)). License: PolyForm Noncommercial — free for personal use, commercial use requires permission.*
+*English TL;DR: **irrelix** is a free, single-file, browser-based screen recorder for creators — screen + webcam overlay composited in real time (WYSIWYG), beauty filters, green screen, teleprompter, multiple aspect ratios (16:9 / 9:16 / 1:1 …), exports mp4/webm. 100% client-side: no install, no signup, no backend, nothing ever uploaded. The entire product is one self-contained HTML file ([`screencap/index.html`](screencap/index.html)). License: MIT.*
 
 ---
 
@@ -51,14 +51,23 @@ docs/README-vue-legacy.md  ← 旧版的说明文档
 
 > 旧版走的是「录完再进画布编辑」路线，含 WebCodecs 导出 mp4、Document PiP 录制指示器等实现，对开发者仍有参考价值，见 [docs/README-vue-legacy.md](docs/README-vue-legacy.md)。
 
+## 💡 可以拿去做什么（复用场景）
+
+这个项目是 MIT 协议，欢迎整块或拆模块复用。几个现成的方向：
+
+- **在线课程 / 网课录制工具** —— 把"屏幕"换成 PPT/白板页面，人像叠加和提词器直接复用，就是一个讲师录课工具
+- **口播 / 自媒体录制台** —— 提词器 + 美颜 + 多画幅（9:16 抖音、16:9 B站）已经齐了，加个脚本管理就是口播工作台
+- **产品演示 / SaaS onboarding 视频工具** —— 录产品操作 + 创始人头像讲解，给官网做 demo 视频
+- **面试模拟 / 演讲练习工具** —— 摄像头 + 提词器 + 回放，帮用户练表达
+- **数字人 / 虚拟形象录制** —— 把摄像头那一路换成数字人渲染流，合成管线不用动
+- **在线客服 / 远程支持录屏** —— 客服录操作指引发给用户，单文件版可以直接内嵌进企业内网（无外部依赖）
+- **任何"隐私敏感"的浏览器工具** —— "单文件 + 纯前端 + 零上传"这个形态本身就值得抄：处理病历、合同、财务数据的小工具都适合走这条路
+
+拆模块的话：屏幕+人像 Canvas 实时合成管线、Canvas 美颜滤镜链、绿幕色键抠像、悬浮提词器（不入录制画面）、多画幅裁切，每一块都能独立搬走（见上面技术要点表）。
+
 ## ⚖️ License
 
-**PolyForm Noncommercial 1.0.0**（源码公开，非商业许可）：
-
-- ✅ **个人使用、学习、研究、修改、非商业分发** —— 免费，随便用
-- ❌ **商业用途**（售卖、集成进商业产品、商用部署等）—— 需要单独授权，请通过 issue 联系
-
-> **补充授权（Additional Grant）**：使用本工具（包括 [irrelix.com](https://irrelix.com) 在线版和下载到本地的单文件版）**录制和制作视频内容**，无论该内容本身是否用于商业目的（如自媒体变现、课程、带货视频等），均视为允许的使用，无需额外授权。本协议限制的是对**代码本身**的商业性使用（售卖代码、集成进商业产品、商用部署衍生服务等）。
+**MIT** —— 随便用：个人、商业、修改、分发都可以，保留版权声明即可。
 
 代码完全公开可审计 —— 这也是我们对「零上传、不收集数据」承诺的最有力证明。
 

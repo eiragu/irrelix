@@ -29,6 +29,8 @@ import {
   getFilterString,
 } from './capture/beauty.js';
 import { loadPrefs, savePrefs } from './editor/prefs.js';
+import { createRecIndicator } from './ui/rec-indicator.js';
+import { showToast } from './ui/toast.js';
 
 const appRoot = document.querySelector('.app');
 const editor = new Editor();
@@ -61,6 +63,7 @@ let state = {
   screenStream: null,
   recording: null, // { stop, result, startedAt }
   timerInterval: null,
+  indicator: null, // 录制中浮窗 / 标题 / favicon
 };
 
 function setStatus(msg, kind = '') {
@@ -208,6 +211,7 @@ function startTimer(fromMs = 0) {
   state.timerInterval = setInterval(() => {
     const elapsed = Date.now() - startTs;
     timerEl.textContent = formatDuration(elapsed);
+    if (state.indicator) state.indicator.tick(elapsed);
   }, 500);
 }
 
@@ -217,6 +221,10 @@ function stopTimer() {
     state.timerInterval = null;
   }
   timerEl.classList.add('hidden');
+  if (state.indicator) {
+    state.indicator.stop();
+    state.indicator = null;
+  }
 }
 
 async function onStart() {
@@ -246,7 +254,21 @@ async function onStart() {
   btnStop.classList.remove('hidden');
   btnStart.classList.add('hidden');
   setStatus('录制中…点"停止录制"结束。', 'recording');
+
+  // 跨窗口提示:标签页标题 + favicon + Document PiP 浮窗(始终置顶)
+  state.indicator = createRecIndicator({ onStop });
   startTimer(0);
+
+  // 录"整个屏幕"时,浮窗会被一起录入(浏览器/OS 限制,无法规避)
+  try {
+    const surface = state.screenStream.getVideoTracks()[0].getSettings().displaySurface;
+    if (surface === 'monitor') {
+      showToast(
+        '提示:你选的是"整个屏幕",录制中浮窗会被一起录进视频。下次想避免,在选择框里选"应用窗口"或"标签页"即可。',
+        { kind: 'warn', duration: 6000 }
+      );
+    }
+  } catch {}
 
   // 用户从浏览器的"停止共享"按钮停止屏幕共享时,自动停止录制
   state.screenStream.getVideoTracks()[0].addEventListener('ended', () => {

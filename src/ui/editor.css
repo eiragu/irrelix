@@ -80,6 +80,9 @@
 .toast.error {
   border-left: 3px solid #FF4757;
 }
+.toast.warn {
+  border-left: 3px solid #FFA502;
+}
 
 /* ========== 导出对话框(5a) ========== */
 .export-dialog {

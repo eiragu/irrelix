@@ -232,6 +232,15 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
 .pen-btn.active{background:var(--accent1);border-color:var(--accent1)}
 .pen-color{width:20px;height:20px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s}
 .pen-color:hover,.pen-color.active{border-color:#fff;transform:scale(1.15)}
+/* 白板模式扩展工具 */
+.pen-toolbar{flex-wrap:wrap;max-width:380px;align-items:center}
+.pen-sep{width:1px;align-self:stretch;background:var(--border);margin:0 3px}
+.draw-overlay{touch-action:none}
+.wb-text-input{position:absolute;z-index:40;background:rgba(255,255,255,0.6);border:1px dashed var(--accent1);border-radius:4px;outline:none;font-family:inherit;font-weight:bold;padding:2px 6px;min-width:80px}
+/* 左侧图形面板(数学常用图形) */
+.shape-toolbar{position:absolute;left:8px;top:50%;transform:translateY(-50%);z-index:30;display:none;flex-direction:column;gap:4px;background:var(--glass);backdrop-filter:blur(12px);border-radius:8px;padding:6px;border:1px solid var(--border);max-height:90%;overflow-y:auto}
+.shape-toolbar.show{display:flex}
+.pen-select{background:var(--card2);color:var(--text);border:1px solid var(--border);border-radius:6px;height:28px;font-size:12px;padding:0 4px;cursor:pointer;outline:none}
 
 /* Utility */
 .hidden{display:none!important}
@@ -290,6 +299,10 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
         仅人像
       </button>
+      <button class="mode-tab" data-mode="board">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="14" rx="2"/><path d="M7 12l3-4 2.5 3L15 8l2 5"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        白板
+      </button>
     </div>
     <div class="bg-status disconnected" id="fxStatusBox" title="鼠标特效后台服务连接状态（cursor_tracker.py）">
       <span class="bg-dot"></span>
@@ -346,12 +359,48 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
       <!-- Drawing overlay -->
       <canvas class="draw-overlay" id="drawCanvas"></canvas>
       <div class="pen-toolbar" id="penToolbar">
-        <button class="pen-btn" id="penToggle" title="画笔">&#9998;</button>
+        <button class="pen-btn wb-tool" id="penToggle" data-tool="pen" title="画笔">&#9998;</button>
+        <button class="pen-btn wb-tool" data-tool="text" title="文本">T</button>
+        <button class="pen-btn wb-tool" data-tool="eraser" title="橡皮">&#9003;</button>
+        <div class="pen-sep"></div>
+        <div class="pen-color" style="background:#111827" data-color="#111827"></div>
         <div class="pen-color active" style="background:#FF4757" data-color="#FF4757"></div>
+        <div class="pen-color" style="background:#3B82F6" data-color="#3B82F6"></div>
         <div class="pen-color" style="background:#FFD93D" data-color="#FFD93D"></div>
         <div class="pen-color" style="background:#2ED573" data-color="#2ED573"></div>
-        <div class="pen-color" style="background:#fff" data-color="#ffffff"></div>
-        <button class="pen-btn" id="penClear" title="清除">&#10005;</button>
+        <div class="pen-color" style="background:#fff;border-color:var(--border)" data-color="#ffffff"></div>
+        <div class="pen-sep"></div>
+        <select class="pen-select" id="wbFontSel" title="字体">
+          <option value="bold|Microsoft YaHei,PingFang SC,sans-serif">默认黑体</option>
+          <option value="300|Microsoft YaHei Light,Microsoft YaHei,PingFang SC,sans-serif">细黑·文艺</option>
+          <option value="normal|KaiTi,STKaiti,BiauKai,serif">楷体·手写感</option>
+          <option value="normal|FangSong,STFangsong,serif">仿宋·细雅</option>
+          <option value="normal|YouYuan,幼圆,STYuanti,Microsoft YaHei,sans-serif">圆体·可爱</option>
+          <option value="bold|Comic Sans MS,Segoe Print,KaiTi,cursive">卡通(英文)</option>
+        </select>
+        <select class="pen-select" id="wbSizeSel" title="字号">
+          <option value="0.035">小字</option>
+          <option value="0.05" selected>中字</option>
+          <option value="0.08">大字</option>
+        </select>
+        <div class="pen-sep"></div>
+        <button class="pen-btn" id="penUndo" title="撤销">&#8630;</button>
+        <button class="pen-btn" id="penClear" title="清空">&#10005;</button>
+      </div>
+      <!-- 左侧图形面板 -->
+      <div class="shape-toolbar" id="shapeToolbar">
+        <button class="pen-btn wb-tool" data-tool="line" title="直线">&#9585;</button>
+        <button class="pen-btn wb-tool" data-tool="arrow" title="箭头">&#8599;</button>
+        <button class="pen-btn wb-tool" data-tool="curve" title="曲线:像画弧一样拖,松手自动变光滑曲线">&#8967;</button>
+        <button class="pen-btn wb-tool" data-tool="rect" title="方框">&#9645;</button>
+        <button class="pen-btn wb-tool" data-tool="ellipse" title="圆/椭圆">&#9711;</button>
+        <button class="pen-btn wb-tool" data-tool="tri" title="三角形">&#9651;</button>
+        <button class="pen-btn wb-tool" data-tool="rtri" title="直角三角形">&#9698;</button>
+        <button class="pen-btn wb-tool" data-tool="diamond" title="菱形">&#9671;</button>
+        <button class="pen-btn wb-tool" data-tool="para" title="平行四边形">&#9649;</button>
+        <button class="pen-btn wb-tool" data-tool="trap" title="梯形">&#9186;</button>
+        <button class="pen-btn wb-tool" data-tool="star" title="五角星">&#9734;</button>
+        <button class="pen-btn wb-tool" data-tool="axes" title="坐标轴">&#10011;</button>
       </div>
 
       <!-- Ratio indicator -->
@@ -848,13 +897,18 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
   }
 
   function updateCamUI() {
-    const needsCam = S.mode === 'screen_cam' || S.mode === 'cam';
+    const needsCam = S.mode === 'screen_cam' || S.mode === 'cam' || S.mode === 'board';
     if (!needsCam || !S.camReady) {
       camPip.style.display = 'none';
       camPreviewFull.style.display = 'none';
       previewContainer.style.background = '#000';
       if (!S.recording) stopCamSolidPreview();
       if (!needsCam) placeholder.style.display = '';
+      // 白板模式没摄像头也能用:白纸预览照常跑
+      if (S.mode === 'board') {
+        placeholder.style.display = 'none';
+        if (!S.recording) startCamSolidPreview();
+      }
       return;
     }
     camPreviewVideo.style.transform = S.mirror ? 'scaleX(-1)' : '';
@@ -876,6 +930,14 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
         previewContainer.style.background = '#000';
         if (!S.recording) startCamSolidPreview();
       }
+    } else if (S.mode === 'board') {
+      // 白板:白纸画布 + 可拖动头像(复用 cam-solid 的实时预览管线)
+      placeholder.style.display = 'none';
+      camPreviewFull.style.display = 'none';
+      camPip.style.display = '';
+      camPip.style.zIndex = '26'; // 高于画笔层,保证头像能拖
+      previewContainer.style.background = '#000';
+      if (!S.recording) startCamSolidPreview();
     } else {
       // screen_cam: only show the small circle, no full-screen face
       if (!S.recording) stopCamSolidPreview();
@@ -923,21 +985,37 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
 
       if (S.mode === 'screen_cam' || S.mode === 'cam') {
         await openCamera();
+      } else if (S.mode === 'board') {
+        // 白板不等摄像头:先进白板,摄像头就绪后头像自动出现(权限弹窗不卡白纸)
+        openCamera();
       } else {
         closeCamera();
       }
       updateCamUI();
+      const noScreen = S.mode === 'cam' || S.mode === 'board';
       $('camControlRow').style.display = S.mode === 'screen' ? 'none' : '';
       $('beautyRow').style.display = S.mode === 'screen' ? 'none' : '';
       $('camBgRow').style.display = S.mode === 'cam' ? '' : 'none';
       $('camClickZoomRow').style.display = S.mode === 'cam' ? '' : 'none';
-      $('bgRow').style.display = S.mode === 'cam' ? 'none' : '';
-      $('azRow').style.display = S.mode === 'cam' ? 'none' : '';
-      $('cursorRow').style.display = S.mode === 'cam' ? 'none' : '';
-      $('cursorPlusRow').style.display = S.mode === 'cam' ? 'none' : '';
+      $('bgRow').style.display = noScreen ? 'none' : '';
+      $('azRow').style.display = noScreen ? 'none' : '';
+      $('cursorRow').style.display = noScreen ? 'none' : '';
+      $('cursorPlusRow').style.display = noScreen ? 'none' : '';
       const sb = $('startBtn');
       if (!S.recording && (S.uiState === 'A' || !S.uiState)) {
-        sb.innerHTML = '<div class="rec-dot"></div>' + (S.mode === 'cam' ? '开始录制' : '选择屏幕');
+        sb.innerHTML = '<div class="rec-dot"></div>' + (noScreen ? '开始录制' : '选择屏幕');
+      }
+      // 白板模式:常驻画笔工具栏,默认黑笔;离开时收起
+      if (S.mode === 'board') {
+        showPenToolbar(true);
+        selectPenColor('#111827');
+        setWbTool('pen');
+      } else if (!S.recording) {
+        showPenToolbar(false);
+        penActive = false;
+        document.querySelectorAll('.wb-tool').forEach(b => b.classList.remove('active'));
+        drawCanvas.classList.remove('active');
+        resetDrawCanvasLayout();
       }
     });
   });
@@ -1233,7 +1311,7 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     let minX = 0, minY = 0;
     let maxX = parent.offsetWidth - camPip.offsetWidth;
     let maxY = parent.offsetHeight - camPip.offsetHeight;
-    if (S.mode === 'cam' && S.camBg !== 'fill' && canvas.width > 0) {
+    if (((S.mode === 'cam' && S.camBg !== 'fill') || S.mode === 'board') && canvas.width > 0) {
       minX = canvas.offsetLeft;
       minY = canvas.offsetTop;
       maxX = canvas.offsetLeft + canvas.offsetWidth - camPip.offsetWidth;
@@ -1356,8 +1434,8 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     $('startBtn').disabled = true;
     $('startBtn').textContent = '选择中...';
     try {
-      if (S.mode === 'cam') {
-        if (!S.camReady) await openCamera();
+      if (S.mode === 'cam' || S.mode === 'board') {
+        if (S.mode === 'cam' && !S.camReady) await openCamera();
         await actuallyStartRecording();
         return;
       }
@@ -1426,7 +1504,8 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
   }
 
   async function actuallyStartRecording() {
-    if (S.mode !== 'screen' && !S.camReady) await openCamera();
+    // 白板模式摄像头可选:进模式时已尝试开过,失败也照常录白板
+    if (S.mode !== 'screen' && S.mode !== 'board' && !S.camReady) await openCamera();
     if (S.mic) {
       try { S.micStream = await navigator.mediaDevices.getUserMedia({ audio: true }); startMicLevel(); }
       catch (e) { S.micStream = null; }
@@ -1440,6 +1519,11 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     if (S.mode === 'cam' && S.camBg !== 'fill') {
       camPip.style.display = '';
       previewContainer.style.background = '#000';
+    }
+    if (S.mode === 'board') {
+      if (S.camReady) camPip.style.display = '';
+      previewContainer.style.background = '#000';
+      showPenToolbar(true);
     }
     setupCanvas();
     await doCountdown();
@@ -1505,7 +1589,7 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     cb.disabled = false;
     if (state === 'A') {
       sb.style.display = '';
-      sb.innerHTML = '<div class="rec-dot"></div>' + (S.mode === 'cam' ? '开始录制' : '选择屏幕');
+      sb.innerHTML = '<div class="rec-dot"></div>' + ((S.mode === 'cam' || S.mode === 'board') ? '开始录制' : '选择屏幕');
       cb.style.display = 'none';
       cb.innerHTML = '<div class="rec-dot"></div>开始录制';
       pb.disabled = true; pb.textContent = '暂停';
@@ -1697,7 +1781,7 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
 
   // ============ Canvas Rendering ============
   function setupCanvas() {
-    if (S.mode === 'cam') {
+    if (S.mode === 'cam' || S.mode === 'board') {
       const [rw, rh] = S.ratio;
       const baseH = 720;
       canvas.width = Math.round(baseH * (rw / rh));
@@ -1711,11 +1795,17 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
   }
 
   function renderLoop() {
-    if (!S.recording && !S.screenStream && !S.camStream) return;
+    if (!S.recording && !S.screenStream && !S.camStream && S.mode !== 'board') return;
     const cw = canvas.width, ch = canvas.height;
     ctx.clearRect(0, 0, cw, ch);
 
-    if (S.mode === 'cam') {
+    if (S.mode === 'board') {
+      // 白板:白纸打底 + 可选头像;笔迹由下方 drawCanvas 合成层画上去
+      syncBoardDrawCanvas();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, cw, ch);
+      if (S.camReady && S.camStream) drawCamPipSolid(cw, ch);
+    } else if (S.mode === 'cam') {
       if (S.camBg === 'fill') {
         ctx.filter = getCamFilter();
         drawCover(ctx, camVideo, 0, 0, cw, ch, S.mirror);
@@ -1760,14 +1850,15 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
       ctx.drawImage(drawCanvas, 0, 0, drawCanvas.width, drawCanvas.height, 0, 0, cw, ch);
     }
     // Spotlight / vignette: dim everything except a bright disc around the cursor
-    if (S.mode !== 'cam') drawSpotlight(cw, ch);
+    const isScreenMode = S.mode !== 'cam' && S.mode !== 'board';
+    if (isScreenMode) drawSpotlight(cw, ch);
     // Cursor FX overlay (after annotations so they sit on top)
-    if (S.mode !== 'cam') drawCursorEffects(cw, ch);
+    if (isScreenMode) drawCursorEffects(cw, ch);
     // Custom fake cursor (selectable style + click feedback), topmost over FX
-    if (S.mode !== 'cam') drawFakeCursor(cw, ch);
+    if (isScreenMode) drawFakeCursor(cw, ch);
     // Screen Studio cinematic frame: wrap the whole composited content in a
     // padded, rounded, shadowed card on a gradient background (screen modes only).
-    if (S.bg.enabled && S.mode !== 'cam' && cw > 0 && ch > 0) applyBgFrame(cw, ch);
+    if (S.bg.enabled && isScreenMode && cw > 0 && ch > 0) applyBgFrame(cw, ch);
     S.animFrame = requestAnimationFrame(renderLoop);
   }
 
@@ -2171,10 +2262,13 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     pipCamFeed.srcObject = null;
     if (ctrlWin && !ctrlWin.closed) { try { ctrlWin.close(); } catch (e) {} }
     ctrlWin = null;
-    showPenToolbar(false);
-    penActive = false;
-    $('penToggle').classList.remove('active');
-    drawCanvas.classList.remove('active');
+    // 白板模式下工具栏常驻,不随录制结束收起
+    if (S.mode !== 'board') {
+      showPenToolbar(false);
+      penActive = false;
+      document.querySelectorAll('.wb-tool').forEach(b => b.classList.remove('active'));
+      drawCanvas.classList.remove('active');
+    }
   }
 
   // ============ Beauty Filters ============
@@ -2216,26 +2310,193 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
   let penColor = '#FF4757';
   let penSize = 3;
   let drawing = false;
+  let wbTool = 'pen';       // pen | text | eraser | line | arrow | curve | rect | ellipse | tri | rtri | diamond | para | trap | star | axes
+  let wbStart = null;       // 图形起点(位图坐标)
+  let wbPath = [];          // 曲线工具:记录拖拽轨迹,实时拟合平滑曲线
+  let wbSnap = null;        // 图形拖拽预览用的快照
+  const wbUndo = [];        // 撤销栈(最多 20 步)
 
-  $('penToggle').addEventListener('click', () => {
-    penActive = !penActive;
-    $('penToggle').classList.toggle('active', penActive);
-    drawCanvas.classList.toggle('active', penActive);
-  });
+  // 位图坐标 <-> 显示坐标换算(白板模式位图=录制分辨率,其余模式 1:1)
+  function wbScale() {
+    const rect = drawCanvas.getBoundingClientRect();
+    return {
+      rect,
+      sx: rect.width ? drawCanvas.width / rect.width : 1,
+      sy: rect.height ? drawCanvas.height / rect.height : 1
+    };
+  }
+  function wbPoint(e) {
+    const { rect, sx, sy } = wbScale();
+    return { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
+  }
+  function wbPushUndo() {
+    if (!drawCanvas.width || !drawCanvas.height) return;
+    try {
+      wbUndo.push(drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height));
+      if (wbUndo.length > 20) wbUndo.shift();
+    } catch (e) {}
+  }
+  function wbApplyStyle() {
+    drawCtx.strokeStyle = penColor;
+    drawCtx.fillStyle = penColor;
+    const { sx } = wbScale();
+    drawCtx.lineWidth = (wbTool === 'eraser' ? 22 : penSize) * Math.max(1, sx);
+    drawCtx.lineCap = 'round';
+    drawCtx.lineJoin = 'round';
+    drawCtx.globalCompositeOperation = wbTool === 'eraser' ? 'destination-out' : 'source-over';
+  }
+  function wbArrowHead(from, to) {
+    const ang = Math.atan2(to.y - from.y, to.x - from.x);
+    const len = Math.max(14, drawCtx.lineWidth * 4);
+    drawCtx.moveTo(to.x, to.y);
+    drawCtx.lineTo(to.x - len * Math.cos(ang - 0.45), to.y - len * Math.sin(ang - 0.45));
+    drawCtx.moveTo(to.x, to.y);
+    drawCtx.lineTo(to.x - len * Math.cos(ang + 0.45), to.y - len * Math.sin(ang + 0.45));
+  }
+  function wbDrawShape(a, b) {
+    const x0 = Math.min(a.x, b.x), y0 = Math.min(a.y, b.y);
+    const x1 = Math.max(a.x, b.x), y1 = Math.max(a.y, b.y);
+    const w = x1 - x0, h = y1 - y0, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    drawCtx.beginPath();
+    if (wbTool === 'line' || wbTool === 'arrow') {
+      drawCtx.moveTo(a.x, a.y);
+      drawCtx.lineTo(b.x, b.y);
+      if (wbTool === 'arrow') wbArrowHead(a, b);
+    } else if (wbTool === 'rect') {
+      drawCtx.rect(x0, y0, w, h);
+    } else if (wbTool === 'ellipse') {
+      drawCtx.ellipse(cx, cy, w / 2, h / 2, 0, 0, Math.PI * 2);
+    } else if (wbTool === 'tri') {
+      // 等腰三角形:顶点在上边中点
+      drawCtx.moveTo(cx, y0); drawCtx.lineTo(x0, y1); drawCtx.lineTo(x1, y1); drawCtx.closePath();
+    } else if (wbTool === 'rtri') {
+      // 直角三角形:直角在左下
+      drawCtx.moveTo(x0, y0); drawCtx.lineTo(x0, y1); drawCtx.lineTo(x1, y1); drawCtx.closePath();
+    } else if (wbTool === 'diamond') {
+      drawCtx.moveTo(cx, y0); drawCtx.lineTo(x1, cy); drawCtx.lineTo(cx, y1); drawCtx.lineTo(x0, cy); drawCtx.closePath();
+    } else if (wbTool === 'para') {
+      const off = w * 0.25;
+      drawCtx.moveTo(x0 + off, y0); drawCtx.lineTo(x1, y0); drawCtx.lineTo(x1 - off, y1); drawCtx.lineTo(x0, y1); drawCtx.closePath();
+    } else if (wbTool === 'trap') {
+      const off = w * 0.22;
+      drawCtx.moveTo(x0 + off, y0); drawCtx.lineTo(x1 - off, y0); drawCtx.lineTo(x1, y1); drawCtx.lineTo(x0, y1); drawCtx.closePath();
+    } else if (wbTool === 'star') {
+      const R = Math.min(w, h) / 2, r = R * 0.4;
+      for (let i = 0; i < 10; i++) {
+        const ang = -Math.PI / 2 + i * Math.PI / 5;
+        const rad = i % 2 === 0 ? R : r;
+        const px = cx + rad * Math.cos(ang), py = cy + rad * Math.sin(ang);
+        if (i === 0) drawCtx.moveTo(px, py); else drawCtx.lineTo(px, py);
+      }
+      drawCtx.closePath();
+    } else if (wbTool === 'axes') {
+      // 坐标轴:原点在左下,x 轴向右、y 轴向上,带箭头
+      drawCtx.moveTo(x0, y1); drawCtx.lineTo(x1, y1);
+      wbArrowHead({ x: x0, y: y1 }, { x: x1, y: y1 });
+      drawCtx.moveTo(x0, y1); drawCtx.lineTo(x0, y0);
+      wbArrowHead({ x: x0, y: y1 }, { x: x0, y: y0 });
+    }
+    drawCtx.stroke();
+  }
+  function wbDrawCurveFromPath() {
+    // 曲线工具:按拖拽轨迹拟合平滑二次贝塞尔——起点、终点取两端,
+    // 弯度取轨迹里"离起终点连线最远的点"(手势拱得最高处),划多弯成品就多弯
+    if (wbPath.length < 2) return;
+    const a = wbPath[0];
+    const b = wbPath[wbPath.length - 1];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const chordLen = Math.hypot(dx, dy) || 1;
+    let m = wbPath[Math.floor(wbPath.length / 2)];
+    let maxDist = 0;
+    for (let i = 1; i < wbPath.length - 1; i++) {
+      const p = wbPath[i];
+      // 点到直线 AB 的垂直距离
+      const dist = Math.abs(dy * p.x - dx * p.y + b.x * a.y - b.y * a.x) / chordLen;
+      if (dist > maxDist) { maxDist = dist; m = p; }
+    }
+    drawCtx.beginPath();
+    drawCtx.moveTo(a.x, a.y);
+    if (maxDist < 2) {
+      // 手势几乎是直线就画直线
+      drawCtx.lineTo(b.x, b.y);
+    } else {
+      const ctrlX = 2 * m.x - (a.x + b.x) / 2;
+      const ctrlY = 2 * m.y - (a.y + b.y) / 2;
+      drawCtx.quadraticCurveTo(ctrlX, ctrlY, b.x, b.y);
+    }
+    drawCtx.stroke();
+  }
+  function setWbTool(tool) {
+    wbTool = tool;
+    penActive = true;
+    document.querySelectorAll('.wb-tool').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
+    drawCanvas.classList.add('active');
+    drawCanvas.style.cursor = tool === 'text' ? 'text' : 'crosshair';
+  }
+  function selectPenColor(c) {
+    penColor = c;
+    document.querySelectorAll('.pen-color').forEach(el => el.classList.toggle('active', el.dataset.color === c));
+  }
 
-  $('penClear').addEventListener('click', () => {
-    drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-  });
-
-  document.querySelectorAll('.pen-color').forEach(el => {
-    el.addEventListener('click', () => {
-      document.querySelectorAll('.pen-color').forEach(c => c.classList.remove('active'));
-      el.classList.add('active');
-      penColor = el.dataset.color;
+  document.querySelectorAll('.wb-tool').forEach(btn => {
+    btn.addEventListener('click', () => {
+      // 屏幕模式下再点当前工具 = 关闭画笔(保留原 penToggle 行为);白板模式常驻
+      if (S.mode !== 'board' && penActive && btn.dataset.tool === wbTool) {
+        penActive = false;
+        btn.classList.remove('active');
+        drawCanvas.classList.remove('active');
+        return;
+      }
+      setWbTool(btn.dataset.tool);
     });
   });
 
+  $('penClear').addEventListener('click', () => {
+    wbPushUndo();
+    drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  });
+
+  $('penUndo').addEventListener('click', () => {
+    const snap = wbUndo.pop();
+    if (snap && snap.width === drawCanvas.width && snap.height === drawCanvas.height) {
+      drawCtx.putImageData(snap, 0, 0);
+    }
+  });
+
+  document.querySelectorAll('.pen-color').forEach(el => {
+    el.addEventListener('click', () => selectPenColor(el.dataset.color));
+  });
+
+  // 白板模式:笔迹层精确覆盖在录制画布上,位图用录制分辨率(成片笔迹清晰、所见即所得)
+  function syncBoardDrawCanvas() {
+    if (S.mode !== 'board') return;
+    const cw = canvas.width, ch = canvas.height;
+    if (!cw || !ch) return;
+    const L = canvas.offsetLeft, T = canvas.offsetTop, W = canvas.offsetWidth, H = canvas.offsetHeight;
+    if (!W || !H) return;
+    const st = drawCanvas.style;
+    if (st.left !== L + 'px' || st.top !== T + 'px' || st.width !== W + 'px' || st.height !== H + 'px') {
+      st.left = L + 'px'; st.top = T + 'px'; st.width = W + 'px'; st.height = H + 'px';
+      st.right = 'auto'; st.bottom = 'auto';
+    }
+    if (drawCanvas.width !== cw || drawCanvas.height !== ch) {
+      // 分辨率变化(如切画幅)时按比例保留已画内容
+      const tmp = document.createElement('canvas');
+      tmp.width = drawCanvas.width; tmp.height = drawCanvas.height;
+      if (tmp.width && tmp.height) tmp.getContext('2d').drawImage(drawCanvas, 0, 0);
+      drawCanvas.width = cw; drawCanvas.height = ch;
+      if (tmp.width && tmp.height) drawCtx.drawImage(tmp, 0, 0, tmp.width, tmp.height, 0, 0, cw, ch);
+      wbUndo.length = 0;
+    }
+  }
+  function resetDrawCanvasLayout() {
+    const st = drawCanvas.style;
+    st.left = ''; st.top = ''; st.width = ''; st.height = ''; st.right = ''; st.bottom = '';
+  }
+
   function resizeDrawCanvas() {
+    if (S.mode === 'board') { syncBoardDrawCanvas(); return; }
+    resetDrawCanvasLayout();
     const w = previewContainer.offsetWidth;
     const h = previewContainer.offsetHeight;
     if (drawCanvas.width !== w || drawCanvas.height !== h) {
@@ -2246,31 +2507,99 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     }
   }
 
-  drawCanvas.addEventListener('mousedown', e => {
+  // 文本工具:点哪写哪,回车/失焦落到画布,Esc 取消
+  function wbFontSpec() {
+    const [weight, family] = ($('wbFontSel') ? $('wbFontSel').value : 'bold|Microsoft YaHei,sans-serif').split('|');
+    const scale = parseFloat($('wbSizeSel') ? $('wbSizeSel').value : '0.05');
+    return { weight, family, scale };
+  }
+  function wbSpawnTextInput(e) {
+    const pt = wbPoint(e);
+    const { sx } = wbScale();
+    const fs = wbFontSpec();
+    const fontPx = Math.max(16, Math.round(drawCanvas.height * fs.scale));
+    const parentRect = previewContainer.getBoundingClientRect();
+    const input = document.createElement('input');
+    input.className = 'wb-text-input';
+    input.style.left = (e.clientX - parentRect.left) + 'px';
+    input.style.top = (e.clientY - parentRect.top - (fontPx / sx) / 2) + 'px';
+    input.style.fontSize = (fontPx / Math.max(1, sx)) + 'px';
+    input.style.color = penColor;
+    input.style.fontFamily = fs.family;   // 输入时就是最终字体,所见即所得
+    input.style.fontWeight = fs.weight;
+    previewContainer.appendChild(input);
+    setTimeout(() => input.focus(), 0);
+    let done = false;
+    const commit = () => {
+      if (done) return;
+      done = true;
+      const v = input.value.trim();
+      input.remove();
+      if (!v) return;
+      wbPushUndo();
+      drawCtx.globalCompositeOperation = 'source-over';
+      drawCtx.fillStyle = penColor;
+      drawCtx.font = fs.weight + ' ' + fontPx + 'px ' + fs.family;
+      drawCtx.textBaseline = 'middle';
+      drawCtx.fillText(v, pt.x, pt.y);
+    };
+    input.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter') commit();
+      if (ev.key === 'Escape') { done = true; input.remove(); }
+    });
+    input.addEventListener('blur', commit);
+  }
+
+  drawCanvas.addEventListener('pointerdown', e => {
     if (!penActive) return;
+    if (wbTool === 'text') { wbSpawnTextInput(e); return; }
     drawing = true;
-    const rect = drawCanvas.getBoundingClientRect();
-    drawCtx.beginPath();
-    drawCtx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
-    drawCtx.strokeStyle = penColor;
-    drawCtx.lineWidth = penSize;
-    drawCtx.lineCap = 'round';
-    drawCtx.lineJoin = 'round';
+    try { drawCanvas.setPointerCapture(e.pointerId); } catch (err) {}
+    wbPushUndo();
+    wbStart = wbPoint(e);
+    wbPath = [wbStart];
+    wbApplyStyle();
+    if (wbTool === 'pen' || wbTool === 'eraser') {
+      drawCtx.beginPath();
+      drawCtx.moveTo(wbStart.x, wbStart.y);
+    } else {
+      try { wbSnap = drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height); } catch (err) { wbSnap = null; }
+    }
   });
 
-  drawCanvas.addEventListener('mousemove', e => {
+  drawCanvas.addEventListener('pointermove', e => {
     if (!drawing) return;
-    const rect = drawCanvas.getBoundingClientRect();
-    drawCtx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
-    drawCtx.stroke();
+    const pt = wbPoint(e);
+    if (wbTool === 'pen' || wbTool === 'eraser') {
+      drawCtx.lineTo(pt.x, pt.y);
+      drawCtx.stroke();
+    } else if (wbTool === 'curve') {
+      // 曲线:记录轨迹,实时拟合平滑曲线(像手画弧,成品自动光滑)
+      wbPath.push(pt);
+      if (wbSnap) drawCtx.putImageData(wbSnap, 0, 0);
+      wbApplyStyle();
+      wbDrawCurveFromPath();
+    } else {
+      // 图形拖拽预览:先还原快照再画当前形状
+      if (wbSnap) drawCtx.putImageData(wbSnap, 0, 0);
+      wbApplyStyle();
+      wbDrawShape(wbStart, pt);
+    }
   });
 
-  drawCanvas.addEventListener('mouseup', () => { drawing = false; });
-  drawCanvas.addEventListener('mouseleave', () => { drawing = false; });
+  function wbEndStroke() {
+    drawing = false;
+    wbSnap = null;
+    wbPath = [];
+    drawCtx.globalCompositeOperation = 'source-over';
+  }
+  drawCanvas.addEventListener('pointerup', wbEndStroke);
+  drawCanvas.addEventListener('pointercancel', wbEndStroke);
 
   // Show pen toolbar during setup & recording
   function showPenToolbar(show) {
     $('penToolbar').classList.toggle('show', show);
+    $('shapeToolbar').classList.toggle('show', show);
     resizeDrawCanvas();
   }
 

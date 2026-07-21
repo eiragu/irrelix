@@ -1,0 +1,2909 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FuYou ScreenCap — 轻量级录屏工具</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0f1419;--card:#1a1f2e;--card2:#232a3e;
+  --accent:linear-gradient(135deg,#6C5CE7,#00B4D8);
+  --accent1:#6C5CE7;--accent2:#00B4D8;
+  --red:#FF4757;--green:#2ED573;
+  --text:#E8E8E8;--text2:#8B8FA3;
+  --border:#2a3142;
+  --glass:rgba(26,31,46,0.85);
+  --radius:12px;
+}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif;min-height:100vh;overflow-x:hidden}
+button{font-family:inherit;cursor:pointer;border:none;outline:none;background:none;color:var(--text)}
+.app{max-width:1100px;margin:0 auto;padding:20px}
+
+/* Header */
+.header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;padding:16px 0;margin-bottom:16px}
+.header .mode-tabs{justify-self:center}
+.header .bg-status{justify-self:end}
+.bg-status{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:20px;background:var(--card2);border:1px solid var(--border);font-size:11px;color:var(--text2);transition:all .2s;cursor:default;white-space:nowrap}
+.bg-dot{width:8px;height:8px;border-radius:50%;background:var(--text2);transition:background .2s,box-shadow .2s}
+.bg-status.connected{border-color:rgba(46,213,115,0.4);color:var(--green)}
+.bg-status.connected .bg-dot{background:var(--green);box-shadow:0 0 6px rgba(46,213,115,0.6)}
+.bg-status.disconnected{border-color:rgba(255,71,87,0.35);color:var(--red)}
+.bg-status.disconnected .bg-dot{background:var(--red)}
+.logo{font-size:20px;font-weight:700;background:var(--accent);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.mode-tabs{display:flex;gap:4px;background:var(--card);border-radius:10px;padding:4px}
+.mode-tab{padding:8px 18px;border-radius:8px;font-size:13px;color:var(--text2);transition:all .25s;display:flex;align-items:center;gap:6px}
+.mode-tab.active{background:var(--accent);color:#fff}
+.mode-tab:hover:not(.active){color:var(--text);background:rgba(255,255,255,0.05)}
+.mode-tab svg{width:16px;height:16px}
+
+/* Preview Area */
+.preview-section{position:relative;background:var(--card);border-radius:var(--radius);overflow:hidden;margin-bottom:16px;border:1px solid var(--border)}
+.preview-container{position:relative;width:100%;display:flex;align-items:center;justify-content:center;background:#000;transition:all .35s ease}
+#screenVideo{display:none}
+#screenVideo.previewing{display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:1}
+#camVideo{display:none}
+#previewCanvas{max-width:100%;max-height:520px;border-radius:4px}
+.ratio-indicator{position:absolute;top:0;left:50%;transform:translateX(-50%);border:2px dashed rgba(108,92,231,0.4);border-radius:8px;pointer-events:none;transition:all .35s ease;z-index:3}
+
+/* Crop overlay */
+.crop-overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;display:none}
+.crop-overlay.active{display:block;pointer-events:auto}
+.crop-mask{position:absolute;top:0;left:0;width:100%;height:100%}
+.crop-box{position:absolute;border:2px solid var(--accent2);cursor:move;z-index:10}
+.crop-box::after{content:'';position:absolute;inset:0;border:1px dashed rgba(255,255,255,0.3)}
+.crop-handle{position:absolute;width:12px;height:12px;background:var(--accent2);border-radius:50%;z-index:11;transform:translate(-50%,-50%)}
+.crop-handle.tl{top:0;left:0;cursor:nw-resize}
+.crop-handle.tr{top:0;left:100%;cursor:ne-resize}
+.crop-handle.bl{top:100%;left:0;cursor:sw-resize}
+.crop-handle.br{top:100%;left:100%;cursor:se-resize}
+.crop-size-label{position:absolute;bottom:-28px;right:0;font-size:11px;color:var(--accent2);background:rgba(0,0,0,0.7);padding:2px 8px;border-radius:4px;white-space:nowrap}
+
+/* Webcam pip */
+.cam-pip{position:absolute;bottom:20px;left:20px;width:80px;height:80px;z-index:20;cursor:grab;overflow:hidden;border:none;transition:border-radius .3s,width .3s,height .3s,box-shadow .2s;box-shadow:0 8px 24px rgba(0,0,0,0.18),0 2px 6px rgba(0,0,0,0.10)}
+.cam-pip.circle{border-radius:50%}
+.cam-pip.square{border-radius:14%}
+.cam-pip.circle video{border-radius:50%}
+.cam-pip.square video{border-radius:14%}
+.cam-pip.dragging{cursor:grabbing;box-shadow:0 0 0 2px var(--accent2),0 10px 28px rgba(0,0,0,0.25)}
+.cam-pip video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.cam-pip-controls{position:absolute;bottom:-36px;left:50%;transform:translateX(-50%);display:flex;gap:6px;opacity:0;transition:opacity .25s;pointer-events:none}
+.cam-pip:hover .cam-pip-controls{opacity:1;pointer-events:auto}
+.pip-btn{width:28px;height:28px;border-radius:50%;background:var(--glass);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;font-size:11px;border:1px solid var(--border);transition:all .2s}
+.pip-btn:hover{background:var(--accent1);transform:scale(1.1)}
+.pip-btn.active{background:var(--accent1)}
+
+/* Placeholder */
+.placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text2);z-index:5}
+.placeholder svg{width:64px;height:64px;opacity:0.3}
+.placeholder p{font-size:14px}
+
+/* Error toast */
+.error-toast{position:fixed;top:24px;left:50%;transform:translateX(-50%);background:#ff4757;color:#fff;padding:12px 24px;border-radius:10px;font-size:14px;z-index:9999;display:none;box-shadow:0 4px 20px rgba(255,71,87,0.4);max-width:90vw;text-align:center}
+.error-toast.show{display:block;animation:toastIn .3s ease-out}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* Cam preview in placeholder */
+.cam-preview-full{position:absolute;inset:0;z-index:2}
+.cam-preview-full video{width:100%;height:100%;object-fit:cover}
+
+/* Controls */
+.controls{background:var(--card);border-radius:var(--radius);padding:24px;border:1px solid var(--border);transition:padding .25s}
+.app.is-recording .controls{padding:14px 24px}
+.app.is-recording .control-row{display:none}
+.app.is-recording #setupHint{display:none!important}
+.app.is-recording .preview-section{margin-bottom:12px}
+.control-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.control-row:last-child{margin-bottom:0}
+.control-label{font-size:12px;color:var(--text2);min-width:52px;flex-shrink:0}
+.ratio-btns{display:flex;gap:6px;flex-wrap:wrap}
+.ratio-btn{padding:6px 14px;border-radius:8px;font-size:12px;background:var(--card2);border:1px solid var(--border);transition:all .2s;color:var(--text2)}
+.ratio-btn:hover{border-color:var(--accent1);color:var(--text)}
+.ratio-btn.active{background:var(--accent);color:#fff;border-color:transparent;box-shadow:0 0 14px rgba(108,92,231,0.45)}
+.custom-ratio-input{display:none;align-items:center;gap:4px;margin-left:4px}
+.custom-ratio-input.show{display:flex}
+.custom-ratio-input input{width:52px;padding:5px 8px;border-radius:6px;background:var(--card2);border:1px solid var(--border);color:var(--text);font-size:12px;text-align:center}
+.custom-ratio-input span{color:var(--text2);font-size:12px}
+
+/* Toggle */
+.toggle-group{display:flex;gap:6px}
+.toggle-btn{padding:6px 14px;border-radius:8px;font-size:12px;background:var(--card2);border:1px solid var(--border);transition:all .2s;color:var(--text2);display:flex;align-items:center;gap:5px}
+.toggle-btn:hover{border-color:var(--accent1)}
+.toggle-btn.on{background:rgba(108,92,231,0.22);border-color:var(--accent1);color:var(--text);box-shadow:0 0 12px rgba(108,92,231,0.38)}
+.toggle-btn .dot{width:6px;height:6px;border-radius:50%;background:var(--text2);transition:background .2s}
+.toggle-btn.on .dot{background:var(--green)}
+
+/* Cam size */
+.ratio-preview{flex-shrink:0;border:1.5px solid var(--accent2);border-radius:3px;background:rgba(0,180,216,0.12);margin-left:6px;transition:width .25s,height .25s;align-self:center}
+/* Teleprompter input row */
+.tele-input-wrap{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}
+.tele-input-wrap textarea{width:100%;min-height:60px;max-height:140px;padding:10px 12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:inherit;resize:vertical;line-height:1.5;transition:border-color .15s}
+.tele-input-wrap textarea:focus{outline:none;border-color:var(--accent1)}
+.tele-input-wrap textarea::placeholder{color:var(--text2);opacity:0.6}
+.tele-input-actions{display:flex;gap:8px;align-items:center}
+.tele-input-actions select{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;font-family:inherit;cursor:pointer;max-width:240px}
+.tele-input-actions select:hover{border-color:var(--accent1)}
+/* Teleprompter floating panel */
+.tele-panel{position:fixed;top:80px;right:40px;width:520px;height:340px;background:rgba(0,0,0,0.88);border:1px solid rgba(255,255,255,0.1);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.6);z-index:9999;color:#fff;display:flex;flex-direction:column;backdrop-filter:blur(12px);overflow:hidden;resize:both}
+.tele-header{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.06);cursor:move;font-size:12px;flex-shrink:0;flex-wrap:wrap;gap:8px;user-select:none}
+.tele-title{font-weight:600;letter-spacing:0.5px}
+.tele-controls{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.tele-btn{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:#fff;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit;transition:background .15s;line-height:1}
+.tele-btn:hover{background:rgba(255,255,255,0.2)}
+.tele-btn.tele-close:hover{background:rgba(255,71,87,0.5)}
+.tele-meter{font-size:10px;color:rgba(255,255,255,0.65);min-width:54px;text-align:center;font-variant-numeric:tabular-nums}
+.tele-sep{width:1px;height:14px;background:rgba(255,255,255,0.15);margin:0 4px}
+.tele-body{overflow:hidden;flex:1;padding:0 24px;position:relative}
+.tele-text{font-size:28px;line-height:1.7;white-space:pre-wrap;color:#fff;font-weight:500;letter-spacing:0.5px;transition:font-size .15s;padding:50% 0}
+.tele-marker{position:absolute;left:0;right:0;top:50%;height:0;border-top:1px solid rgba(108,92,231,0.5);box-shadow:0 0 8px rgba(108,92,231,0.3);pointer-events:none}
+.size-dots{display:flex;gap:8px;align-items:center}
+.size-dot{width:10px;height:10px;border-radius:50%;background:var(--text2);opacity:0.4;cursor:pointer;transition:all .2s}
+.size-dot.m{width:14px;height:14px}
+.size-dot.l{width:18px;height:18px}
+.size-dot.active{opacity:1;background:var(--accent2)}
+/* Sub-groups inside control-row (camera controls etc.) */
+.sub-group{display:inline-flex;align-items:center;gap:6px}
+.sub-label{font-size:11px;color:var(--text2);font-weight:500;letter-spacing:0.3px;margin-right:4px;opacity:0.85}
+#camControlRow{gap:24px}
+
+/* Main action bar */
+.action-bar{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:6px;padding-top:14px;border-top:1px solid var(--border)}
+.rec-btn{padding:12px 32px;border-radius:50px;font-size:15px;font-weight:600;transition:all .25s;display:flex;align-items:center;gap:10px;min-height:44px}
+/* State A/D: primary brand gradient */
+.rec-btn.start{background:var(--accent);color:#fff;box-shadow:0 4px 16px rgba(108,92,231,0.35)}
+.rec-btn.start:hover{transform:scale(1.03);box-shadow:0 6px 20px rgba(108,92,231,0.5)}
+/* State B: confirmBtn — solid red "● 开始录制" */
+.rec-btn.confirm-rec{background:var(--red);color:#fff;box-shadow:0 4px 16px rgba(255,71,87,0.35)}
+.rec-btn.confirm-rec:hover{background:#ff6b7a;transform:scale(1.03);box-shadow:0 6px 20px rgba(255,71,87,0.5)}
+/* State C: solid red, dot pulses, embedded timer */
+.rec-btn.recording{background:var(--red);color:#fff;box-shadow:0 4px 16px rgba(255,71,87,0.35);cursor:default}
+.rec-btn.recording:hover{transform:none}
+.rec-btn .btn-timer{font-variant-numeric:tabular-nums;letter-spacing:1px;font-weight:600;margin-left:4px;opacity:0.95}
+.rec-btn.pause{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:10px 22px;font-size:14px}
+.rec-btn.pause:hover:not(:disabled){border-color:var(--accent1)}
+.rec-btn.stop{background:var(--card2);border:1px solid var(--red);color:var(--red);padding:10px 22px;font-size:14px}
+.rec-btn.stop:hover:not(:disabled){background:rgba(255,71,87,0.1)}
+.rec-btn:disabled{opacity:0.35;pointer-events:none}
+.rec-dot{width:10px;height:10px;border-radius:50%;background:#fff;flex-shrink:0}
+.rec-btn.recording .rec-dot{animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.35;transform:scale(0.85)}}
+.rec-btn.recording{animation:recBtnGlow 1.5s ease-in-out infinite}
+@keyframes recBtnGlow{0%,100%{box-shadow:0 4px 16px rgba(255,71,87,0.35)}50%{box-shadow:0 4px 24px rgba(255,71,87,0.6)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.timer{display:none}
+.timer.active{color:var(--red)}
+
+/* Countdown overlay */
+.countdown-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:100;border-radius:var(--radius)}
+.countdown-overlay.show{display:flex}
+.countdown-num{font-size:48px;font-weight:800;background:var(--accent);-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:countPop .8s ease-out}
+@keyframes countPop{0%{transform:scale(1.3);opacity:0}30%{transform:scale(1);opacity:1}100%{opacity:1}}
+
+/* Done page */
+.done-page{display:none;flex-direction:column;align-items:center;gap:20px;padding:40px 20px}
+.done-page.show{display:flex}
+.done-title{font-size:20px;font-weight:600;color:var(--green)}
+.done-video{max-width:100%;max-height:400px;border-radius:var(--radius);background:#000}
+.done-actions{display:flex;gap:12px}
+.done-btn{padding:12px 28px;border-radius:10px;font-size:14px;font-weight:500;transition:all .2s}
+.done-btn.download{background:var(--accent);color:#fff}
+.done-btn.download:hover{transform:scale(1.03);box-shadow:0 4px 20px rgba(108,92,231,0.4)}
+.done-btn.redo{background:var(--card2);border:1px solid var(--border);color:var(--text)}
+.done-btn.redo:hover{border-color:var(--accent1)}
+
+/* Fixed control bar (top-right, always visible during recording) */
+.rec-bar{position:fixed;top:16px;right:16px;background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:10px;padding:8px 14px;display:none;align-items:center;gap:8px;z-index:9000;box-shadow:0 4px 24px rgba(0,0,0,0.5)}
+.rec-bar.show{display:flex}
+.rec-bar .dot{width:7px;height:7px;border-radius:50%;background:var(--red);animation:pulse 1.2s infinite;flex-shrink:0}
+.rec-bar .dot.paused{background:#FFB347;animation:none}
+.rec-bar .time{font-size:12px;color:var(--text2);font-variant-numeric:tabular-nums;min-width:52px}
+.rec-bar .rbtn{padding:4px 12px;border-radius:6px;font-size:11px;background:var(--card2);border:1px solid var(--border);color:var(--text);transition:all .15s;cursor:pointer;font-family:inherit}
+.rec-bar .rbtn:hover{border-color:var(--accent1)}
+.rec-bar .rbtn.stop{border-color:var(--red);color:var(--red)}
+.rec-bar .rbtn.stop:hover{background:rgba(255,71,87,0.15)}
+
+/* Old float bar - keep as fallback */
+.float-bar{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:50px;padding:6px 18px;display:none;align-items:center;gap:10px;z-index:1000;box-shadow:0 8px 32px rgba(0,0,0,0.5)}
+.float-bar.show{display:flex}
+.float-dot{width:7px;height:7px;border-radius:50%;background:var(--red);animation:pulse 1.2s infinite}
+.float-bar .timer{font-size:11px;min-width:50px;color:var(--text2)}
+.float-btn{padding:5px 14px;border-radius:20px;font-size:12px;background:var(--card2);border:1px solid var(--border);color:var(--text);transition:all .2s}
+.float-btn:hover{border-color:var(--accent1)}
+.float-btn.stop-btn{border-color:var(--red);color:var(--red)}
+.float-btn.stop-btn:hover{background:rgba(255,71,87,0.15)}
+
+/* Mic level */
+.mic-level{width:60px;height:4px;border-radius:2px;background:var(--card2);overflow:hidden;margin-left:4px}
+.mic-level-bar{height:100%;width:0%;background:var(--green);border-radius:2px;transition:width 0.1s}
+
+/* Screen Studio cinematic background */
+.bg-swatches{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.bg-sw{width:24px;height:24px;border-radius:7px;cursor:pointer;border:2px solid transparent;transition:transform .15s,box-shadow .15s;flex-shrink:0}
+.bg-sw:hover{transform:scale(1.12)}
+.bg-sw.active{border-color:#fff;box-shadow:0 0 10px rgba(255,255,255,0.35)}
+
+/* Drawing overlay */
+.draw-overlay{position:absolute;inset:0;z-index:25;cursor:crosshair;display:none}
+.draw-overlay.active{display:block}
+.pen-toolbar{position:absolute;top:8px;right:8px;z-index:30;display:none;gap:4px;background:var(--glass);backdrop-filter:blur(12px);border-radius:8px;padding:6px;border:1px solid var(--border)}
+.pen-toolbar.show{display:flex}
+.pen-btn{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;background:var(--card2);border:1px solid var(--border);transition:all .15s;cursor:pointer;color:var(--text)}
+.pen-btn:hover{border-color:var(--accent1)}
+.pen-btn.active{background:var(--accent1);border-color:var(--accent1)}
+.pen-color{width:20px;height:20px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s}
+.pen-color:hover,.pen-color.active{border-color:#fff;transform:scale(1.15)}
+
+/* Utility */
+.hidden{display:none!important}
+.sep{width:1px;height:20px;background:var(--border);flex-shrink:0}
+
+/* Env warning banner */
+.env-banner{background:linear-gradient(135deg,#6C5CE7,#00B4D8);border-radius:var(--radius);padding:28px 32px;margin-bottom:20px;text-align:center;display:none}
+.env-banner.show{display:block}
+.env-banner h2{font-size:18px;margin-bottom:12px;color:#fff}
+.env-banner p{font-size:13px;color:rgba(255,255,255,0.85);line-height:1.8;margin-bottom:8px}
+.env-banner code{background:rgba(0,0,0,0.3);padding:2px 8px;border-radius:4px;font-size:13px;color:#fff;font-family:monospace}
+.env-banner .steps{text-align:left;display:inline-block;margin:12px 0}
+.env-banner .steps li{margin-bottom:6px}
+.env-banner .env-btn{display:inline-block;margin-top:12px;padding:12px 32px;background:#fff;color:#6C5CE7;font-weight:700;border-radius:10px;font-size:15px;cursor:pointer;border:none;transition:transform .2s}
+.env-banner .env-btn:hover{transform:scale(1.04)}
+.env-status{display:flex;gap:12px;justify-content:center;margin-bottom:16px;flex-wrap:wrap}
+.env-tag{padding:4px 12px;border-radius:6px;font-size:12px}
+.env-tag.ok{background:rgba(46,213,115,0.2);color:#2ED573}
+.env-tag.fail{background:rgba(255,71,87,0.2);color:#FF4757}
+</style>
+<style id="web-build-hide-fx">
+/* 线上版：隐藏依赖本地 cursor_tracker.py 的鼠标特效功能 */
+#fxStatusBox,#azRow,#fxTrailRow,#fxClickRow,#cursorRow,#cursorPlusRow{display:none!important}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- Environment detection banner -->
+  <div class="env-banner" id="envBanner">
+    <h2>当前环境不支持录屏 API</h2>
+    <div class="env-status" id="envStatus"></div>
+    <p>浏览器要求在<strong>安全上下文</strong>中才能使用摄像头和屏幕录制功能</p>
+    <p>最简单的方法：<strong>下载此文件到你的电脑，本地打开</strong></p>
+    <ol class="steps">
+      <li>点击下方按钮下载 <code>index.html</code></li>
+      <li>打开终端，进入下载目录，运行: <code>python3 -m http.server 8080</code></li>
+      <li>浏览器访问 <code>http://localhost:8080</code></li>
+    </ol>
+    <button class="env-btn" id="downloadHtmlBtn">下载 index.html</button>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">FuYou ScreenCap</div>
+    <div class="mode-tabs">
+      <button class="mode-tab active" data-mode="screen_cam">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><circle cx="18" cy="18" r="4" fill="currentColor" stroke="none" opacity="0.6"/></svg>
+        屏幕+人像
+      </button>
+      <button class="mode-tab" data-mode="screen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        仅屏幕
+      </button>
+      <button class="mode-tab" data-mode="cam">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
+        仅人像
+      </button>
+    </div>
+    <div class="bg-status disconnected" id="fxStatusBox" title="鼠标特效后台服务连接状态（cursor_tracker.py）">
+      <span class="bg-dot"></span>
+      <span id="fxStatus">后台未连接</span>
+    </div>
+  </div>
+
+  <!-- Preview -->
+  <div class="preview-section" id="previewSection">
+    <div class="preview-container" id="previewContainer">
+      <video id="screenVideo" autoplay muted playsinline></video>
+      <video id="camVideo" autoplay muted playsinline></video>
+      <canvas id="previewCanvas"></canvas>
+
+      <!-- Full cam preview (for cam-only mode or pre-recording preview) -->
+      <div class="cam-preview-full" id="camPreviewFull" style="display:none">
+        <video id="camPreviewVideo" autoplay muted playsinline style="transform:scaleX(-1)"></video>
+      </div>
+
+      <!-- Placeholder -->
+      <div class="placeholder" id="placeholder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16"/></svg>
+        <p id="placeholderText">① 选择录制模式 → ② 选择屏幕源 → ③ 开始录制</p>
+      </div>
+
+      <!-- Crop overlay -->
+      <div class="crop-overlay" id="cropOverlay">
+        <svg class="crop-mask" id="cropMask">
+          <defs><mask id="cropMaskDef"><rect width="100%" height="100%" fill="white"/><rect id="cropMaskHole" fill="black"/></mask></defs>
+          <rect width="100%" height="100%" fill="rgba(0,0,0,0.55)" mask="url(#cropMaskDef)"/>
+        </svg>
+        <div class="crop-box" id="cropBox">
+          <div class="crop-handle tl" data-dir="tl"></div>
+          <div class="crop-handle tr" data-dir="tr"></div>
+          <div class="crop-handle bl" data-dir="bl"></div>
+          <div class="crop-handle br" data-dir="br"></div>
+          <div class="crop-size-label" id="cropSizeLabel">1920 × 1080</div>
+        </div>
+      </div>
+
+      <!-- Webcam PiP -->
+      <div class="cam-pip circle" id="camPip" style="display:none">
+        <video id="camPipVideo" autoplay muted playsinline></video>
+      </div>
+
+      <!-- Drawing overlay -->
+      <canvas class="draw-overlay" id="drawCanvas"></canvas>
+      <div class="pen-toolbar" id="penToolbar">
+        <button class="pen-btn" id="penToggle" title="画笔">&#9998;</button>
+        <div class="pen-color active" style="background:#FF4757" data-color="#FF4757"></div>
+        <div class="pen-color" style="background:#FFD93D" data-color="#FFD93D"></div>
+        <div class="pen-color" style="background:#2ED573" data-color="#2ED573"></div>
+        <div class="pen-color" style="background:#fff" data-color="#ffffff"></div>
+        <button class="pen-btn" id="penClear" title="清除">&#10005;</button>
+      </div>
+
+      <!-- Ratio indicator -->
+      <div class="ratio-indicator" id="ratioIndicator"></div>
+
+      <!-- Countdown -->
+      <div class="countdown-overlay" id="countdownOverlay">
+        <div class="countdown-num" id="countdownNum">3</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls" id="controlsPanel">
+    <div class="control-row">
+      <span class="control-label">比例</span>
+      <div class="ratio-btns" id="ratioBtns">
+        <button class="ratio-btn active" data-ratio="16:9">16:9</button>
+        <button class="ratio-btn" data-ratio="4:3">4:3</button>
+        <button class="ratio-btn" data-ratio="3:4">3:4</button>
+        <button class="ratio-btn" data-ratio="9:16">9:16</button>
+        <button class="ratio-btn" data-ratio="1:1">1:1</button>
+        <button class="ratio-btn" data-ratio="21:9">21:9</button>
+        <button class="ratio-btn" data-ratio="custom">自定义</button>
+      </div>
+      <div class="custom-ratio-input" id="customRatioInput">
+        <input type="number" id="customW" placeholder="宽" min="1" value="16">
+        <span>:</span>
+        <input type="number" id="customH" placeholder="高" min="1" value="9">
+        <button class="ratio-btn" id="customApply" style="padding:5px 10px">确定</button>
+      </div>
+      <div class="ratio-preview" id="ratioPreview" title="当前比例预览"></div>
+    </div>
+
+    <div class="control-row" id="camControlRow">
+      <span class="control-label">摄像头</span>
+      <div class="sub-group">
+        <span class="sub-label">形状</span>
+        <button class="toggle-btn on" data-shape="circle">圆形</button>
+        <button class="toggle-btn" data-shape="square">方形</button>
+      </div>
+      <div class="sub-group">
+        <span class="sub-label">大小</span>
+        <button class="toggle-btn" data-camsize="s">小</button>
+        <button class="toggle-btn on" data-camsize="m">中</button>
+        <button class="toggle-btn" data-camsize="l">大</button>
+      </div>
+      <div class="sub-group">
+        <button class="toggle-btn on" id="mirrorBtn" title="左右镜像">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          <span>镜像</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="control-row" id="camBgRow" style="display:none">
+      <span class="control-label">背景</span>
+      <div class="toggle-group" style="gap:6px;flex-wrap:wrap;align-items:center">
+        <button class="toggle-btn on" data-bg="fill">摄像头铺满</button>
+        <button class="toggle-btn" data-bg="#FFFFFF">白色</button>
+        <button class="toggle-btn" data-bg="#000000">黑色</button>
+        <button class="toggle-btn" data-bg="#00B140">绿幕</button>
+        <label class="toggle-btn" id="camBgCustomLabel" style="cursor:pointer;gap:6px">
+          <span>自定义</span>
+          <input type="color" id="camBgColor" value="#1E2235" style="width:18px;height:18px;border:none;background:none;padding:0;cursor:pointer">
+        </label>
+      </div>
+      <span style="font-size:11px;color:var(--text2);margin-left:6px">选纯色后可拖动头像调整位置</span>
+    </div>
+
+    <div class="control-row" id="camClickZoomRow" style="display:none">
+      <span class="control-label">点击放大</span>
+      <div class="toggle-group">
+        <button class="toggle-btn" data-camzoom="off">关闭</button>
+        <button class="toggle-btn on" data-camzoom="on">开启</button>
+      </div>
+      <span style="font-size:11px;color:var(--text2);margin-left:6px">点击鼠标时头像放大约2秒,然后自动收回</span>
+    </div>
+
+    <div class="control-row" id="beautyRow">
+      <span class="control-label">美颜</span>
+      <div class="toggle-group" style="gap:4px;flex-wrap:wrap">
+        <button class="toggle-btn" id="beautyOff" data-beauty="off" style="padding:4px 10px;font-size:11px">关闭</button>
+        <button class="toggle-btn on" id="beautyNatural" data-beauty="natural" style="padding:4px 10px;font-size:11px">自然</button>
+        <button class="toggle-btn" id="beautyWhite" data-beauty="white" style="padding:4px 10px;font-size:11px">美白</button>
+        <button class="toggle-btn" id="beautyFull" data-beauty="full" style="padding:4px 10px;font-size:11px">精修</button>
+      </div>
+    </div>
+
+    <div class="control-row">
+      <span class="control-label">音频</span>
+      <div class="toggle-group">
+        <button class="toggle-btn on" id="micBtn">
+          <div class="dot"></div>
+          <span>麦克风</span>
+        </button>
+        <div class="mic-level" id="micLevel"><div class="mic-level-bar" id="micLevelBar"></div></div>
+        <div class="sep"></div>
+        <button class="toggle-btn on" id="sysAudioBtn">
+          <div class="dot"></div>
+          <span>系统声音</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="control-row" id="bgRow">
+      <span class="control-label">电影背景</span>
+      <div class="toggle-group">
+        <button class="toggle-btn on" data-bgframe="off">关闭</button>
+        <button class="toggle-btn" data-bgframe="on">开启</button>
+      </div>
+      <div class="bg-swatches" id="bgSwatches"></div>
+      <div class="sub-group" style="margin-left:auto">
+        <span class="sub-label">留白</span>
+        <button class="toggle-btn" data-bgpad="s">小</button>
+        <button class="toggle-btn on" data-bgpad="m">中</button>
+        <button class="toggle-btn" data-bgpad="l">大</button>
+      </div>
+    </div>
+
+    <div class="control-row" id="azRow">
+      <span class="control-label">智能变焦</span>
+      <div class="toggle-group">
+        <button class="toggle-btn on" data-az="off">关闭</button>
+        <button class="toggle-btn" data-az="on">开启</button>
+      </div>
+      <div class="sub-group">
+        <span class="sub-label">强度</span>
+        <button class="toggle-btn" data-azmax="1.4">弱</button>
+        <button class="toggle-btn on" data-azmax="1.8">中</button>
+        <button class="toggle-btn" data-azmax="2.2">强</button>
+      </div>
+      <span style="font-size:11px;color:var(--text2);margin-left:6px">跟随鼠标自动推近/拉远 · 需后台 cursor_tracker.py</span>
+    </div>
+
+    <div class="control-row" id="fxTrailRow">
+      <span class="control-label">拖尾效果</span>
+      <div class="toggle-group">
+        <button class="toggle-btn on" data-trail="off">关闭</button>
+        <button class="toggle-btn" data-trail="rainbow">彩虹</button>
+        <button class="toggle-btn" data-trail="stars">星星</button>
+        <button class="toggle-btn" data-trail="hearts">心形</button>
+      </div>
+    </div>
+    <div class="control-row" id="fxClickRow">
+      <span class="control-label">点击效果</span>
+      <div class="toggle-group">
+        <button class="toggle-btn on" data-click="off">关闭</button>
+        <button class="toggle-btn" data-click="ripple">波纹</button>
+        <button class="toggle-btn" data-click="zoom">放大</button>
+      </div>
+    </div>
+
+    <div class="control-row" id="cursorRow">
+      <span class="control-label">自定义光标</span>
+      <div class="toggle-group">
+        <button class="toggle-btn on" data-cursor="off">关闭</button>
+        <button class="toggle-btn" data-cursor="arrow">箭头</button>
+        <button class="toggle-btn" data-cursor="hand">手 👆</button>
+        <button class="toggle-btn" data-cursor="ring">圆环</button>
+        <button class="toggle-btn" data-cursor="dot">圆点</button>
+      </div>
+      <span style="font-size:11px;color:var(--text2);margin-left:6px">替换系统光标，点击有反馈 · 选屏前先选 · 需后台 cursor_tracker.py</span>
+    </div>
+
+    <div class="control-row" id="cursorPlusRow">
+      <span class="control-label">光标增强</span>
+      <div class="toggle-group">
+        <button class="toggle-btn" data-enh="spot"><div class="dot"></div><span>聚光灯</span></button>
+        <button class="toggle-btn" data-enh="sound"><div class="dot"></div><span>点击咔哒声</span></button>
+        <button class="toggle-btn" data-enh="idle"><div class="dot"></div><span>闲置隐藏光标</span></button>
+      </div>
+      <span style="font-size:11px;color:var(--text2);margin-left:6px">各自独立开关，要哪个点哪个 · 需后台 cursor_tracker.py</span>
+    </div>
+
+    <div class="control-row" id="teleRow">
+      <span class="control-label">提词器</span>
+      <div class="tele-input-wrap">
+        <textarea id="scriptText" placeholder="粘贴讲稿/脚本…录制时浮动显示在屏幕上，自动滚动（不会被录进视频）"></textarea>
+        <div class="tele-input-actions">
+          <select id="scriptHistory" title="历史脚本"><option value="">📜 历史脚本…</option></select>
+          <button class="toggle-btn" id="openTeleBtn">打开提词器</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button class="rec-btn start" id="startBtn">
+        <div class="rec-dot"></div>
+        选择屏幕
+      </button>
+      <button class="rec-btn confirm-rec" id="confirmBtn" style="display:none">
+        <div class="rec-dot"></div>
+        开始录制
+      </button>
+      <button class="rec-btn pause" id="pauseBtn" disabled>暂停</button>
+      <button class="rec-btn stop" id="stopBtn" disabled>停止</button>
+      <div class="timer" id="timer">00:00:00</div>
+    </div>
+    <p id="setupHint" style="display:none;text-align:center;font-size:12px;color:var(--text2);margin-top:8px">拖动裁切框选择录制区域，拖动摄像头圈调整位置，满意后点击「开始录制」</p>
+  </div>
+
+  <!-- Done Page -->
+  <div class="done-page" id="donePage">
+    <div class="done-title">录制完成</div>
+    <video class="done-video" id="doneVideo" controls></video>
+    <div class="done-actions">
+      <button class="done-btn download" id="downloadBtn">下载视频</button>
+      <button class="done-btn redo" id="redoBtn">重新录制</button>
+    </div>
+    <p style="font-size:11px;color:var(--text2);margin-top:4px">MP4 格式可直接上传抖音、小红书、B站等平台</p>
+  </div>
+</div>
+
+<!-- Fixed recording control bar (top-right) -->
+<div class="rec-bar" id="recBar">
+  <div class="dot" id="recBarDot"></div>
+  <span class="time" id="recBarTime">00:00:00</span>
+  <button class="rbtn" id="recBarPause">暂停</button>
+  <button class="rbtn stop" id="recBarStop">停止</button>
+</div>
+
+<!-- Error toast -->
+<div class="error-toast" id="errorToast"></div>
+
+<!-- Floating bar (fallback when PiP not available) -->
+<div class="float-bar" id="floatBar">
+  <div class="float-dot"></div>
+  <div class="timer" id="floatTimer">00:00:00</div>
+  <button class="float-btn" id="floatPauseBtn">暂停</button>
+  <button class="float-btn stop-btn" id="floatStopBtn">停止</button>
+</div>
+
+<!-- Teleprompter floating panel -->
+<div class="tele-panel" id="telePanel" style="display:none">
+  <div class="tele-header" id="teleHeader">
+    <span class="tele-title">📜 提词器</span>
+    <div class="tele-controls">
+      <button class="tele-btn" id="teleSlower" title="降速">−</button>
+      <span class="tele-meter" id="teleSpeedLabel">40 px/s</span>
+      <button class="tele-btn" id="teleFaster" title="提速">+</button>
+      <span class="tele-sep"></span>
+      <button class="tele-btn" id="teleSmaller" title="字小">A−</button>
+      <span class="tele-meter" id="teleFontSizeLabel">28px</span>
+      <button class="tele-btn" id="teleBigger" title="字大">A+</button>
+      <span class="tele-sep"></span>
+      <button class="tele-btn" id="teleRewind" title="回到开头">⏮</button>
+      <button class="tele-btn" id="telePlayPause" title="暂停 / 继续 (空格)">⏸</button>
+      <span class="tele-sep"></span>
+      <button class="tele-btn tele-close" id="teleClose" title="关闭 (ESC)">✕</button>
+    </div>
+  </div>
+  <div class="tele-body" id="teleBody">
+    <div class="tele-text" id="teleText"></div>
+    <div class="tele-marker"></div>
+  </div>
+</div>
+
+<!-- PiP elements -->
+<video id="pipVideo" style="display:none" playsinline></video>
+<canvas id="pipCanvas" width="400" height="160" style="display:none"></canvas>
+<canvas id="pipCamCanvas" width="300" height="300" style="display:none"></canvas>
+<video id="pipCamFeed" style="display:none" autoplay muted playsinline></video>
+
+<script>
+(() => {
+  // ============ Environment Detection ============
+  const $ = id => document.getElementById(id);
+  const isSecure = window.isSecureContext;
+  const hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  const hasDisplayMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+
+  // Download button always works
+  $('downloadHtmlBtn').addEventListener('click', () => {
+    const html = document.documentElement.outerHTML;
+    const blob = new Blob(['<!DOCTYPE html>\n' + html], { type: 'text/html;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'FuYou-ScreenCap.html';
+    a.click();
+  });
+
+  if (!isSecure || !hasMediaDevices) {
+    const banner = $('envBanner');
+    const status = $('envStatus');
+    banner.classList.add('show');
+
+    const checks = [
+      { label: '安全上下文(HTTPS/localhost)', ok: isSecure },
+      { label: 'mediaDevices API', ok: hasMediaDevices },
+      { label: 'getDisplayMedia', ok: hasDisplayMedia },
+    ];
+    status.innerHTML = checks.map(c =>
+      `<span class="env-tag ${c.ok ? 'ok' : 'fail'}">${c.ok ? '✓' : '✗'} ${c.label}</span>`
+    ).join('');
+
+    // Don't block the rest — user can still browse UI, but recording won't work
+  }
+
+  // ============ State ============
+  const S = {
+    mode: 'screen_cam',
+    ratio: [16, 9],
+    camShape: 'circle',
+    camSize: 'm',
+    camBg: 'fill',        // 'fill' = 摄像头铺满 | 颜色值(如 '#FFFFFF') = 纯色背景+人像小窗
+    camZoomClick: true,   // 仅人像: 鼠标点击时头像放大强调 ~2s 再收回
+    mirror: true,
+    mic: true,
+    sysAudio: true,
+    recording: false,
+    paused: false,
+    screenStream: null,
+    camStream: null,
+    micStream: null,
+    recorder: null,
+    chunks: [],
+    startTime: 0,
+    elapsed: 0,
+    timerInterval: null,
+    animFrame: null,
+    blob: null,
+    camReady: false,
+    cropRect: { x: 0, y: 0, w: 0, h: 0 },
+    // ===== Screen Studio 风格：电影感效果 =====
+    bg: {
+      enabled: false,
+      preset: 'aurora',   // 见 BG_PRESETS
+      padding: 0.055,     // 留白占短边比例
+      radius: 0.028,      // 圆角占短边比例
+      shadow: true,
+    },
+    az: {                 // 智能自动变焦
+      enabled: false,
+      level: 1,           // 当前已缓动的缩放
+      fx: 0.5, fy: 0.5,   // 当前已缓动的焦点(归一化)
+      tx: 0.5, ty: 0.5,   // 目标焦点
+      max: 1.8,           // 推近倍数
+      lastActivity: -1e9,
+      lastT: 0,
+    },
+    cursorFx: {           // 自定义假光标(平滑跟随 + 可选样式 + 点击反馈)
+      enabled: false,
+      style: 'arrow',     // 'arrow' | 'hand' | 'ring' | 'dot'
+      x: 0.5, y: 0.5,     // 已缓动的归一化坐标
+      has: false,
+      lastT: 0,
+      clickT0: -1e9,      // 最近一次点击时间(performance.now) 用于按下/圆环动画
+      idleHide: false,    // 闲置自动隐藏假光标
+      alpha: 1,           // 当前淡入淡出透明度
+    },
+    spot: {               // 聚光灯/暗角:光标周围亮,四周压暗
+      enabled: false,
+      radius: 0.22,       // 亮区半径占短边比例
+      dim: 0.55,          // 四周压暗强度 0~1
+    },
+    clickSound: {         // 点击咔哒声(合成,直接录进成片)
+      enabled: false,
+    },
+    fx: {
+      trail: 'off',         // 默认关闭(需要再手动开); 'rainbow' | 'stars' | 'hearts' | 'off'
+      clickMode: 'off',     // 默认关闭(需要再手动开); 'off' | 'ripple' | 'zoom'  (mutually exclusive)
+      zoomLevel: 1.6,
+      cursorPos: null,      // {x, y} normalized [0,1]
+      trailHistory: [],     // [{x, y, t}]
+      ripples: [],          // [{x, y, t0}]
+      stars: [],            // [{x, y, vx, vy, t0, life, color}]
+      zoomState: null,      // {x, y, t0}
+      ws: null,
+      wsConnected: false,
+      _src: null,           // last drawImage source rect (canvas-px / video-px)
+      camPulseT0: -1e9,     // 头像点击放大动画的起始时间(performance.now)
+    },
+  };
+
+  // FX timing constants
+  const FX = {
+    TRAIL_FADE_MS: 600,
+    RIPPLE_DUR_MS: 800,
+    STAR_LIFE_MS: 700,
+    ZOOM_IN_MS: 350,
+    ZOOM_HOLD_MS: 1400,
+    ZOOM_OUT_MS: 450,
+  };
+
+  // ===== 电影感效果常量 =====
+  const AUTOZOOM = {
+    HOLD_MS: 2400,   // 最后一次操作后保持推近的时长
+    IN_TAU: 240,     // 推近缓动时间常数(ms)
+    OUT_TAU: 420,    // 拉远缓动时间常数(ms)
+    FOCUS_TAU: 240,  // 焦点跟随缓动时间常数(ms)
+  };
+  const CURSOR_TAU = 95; // 假光标插值平滑时间常数(ms)
+
+  // 背景预设：每个是一个 (ctx,w,h)=>fillStyle 的函数
+  const BG_PRESETS = {
+    aurora:   (c,w,h) => { const g=c.createLinearGradient(0,0,w,h); g.addColorStop(0,'#6C5CE7'); g.addColorStop(1,'#00B4D8'); return g; },
+    sunset:   (c,w,h) => { const g=c.createLinearGradient(0,0,w,h); g.addColorStop(0,'#FF6B6B'); g.addColorStop(1,'#FFB36B'); return g; },
+    ocean:    (c,w,h) => { const g=c.createLinearGradient(0,0,w,h); g.addColorStop(0,'#2193b0'); g.addColorStop(1,'#6dd5ed'); return g; },
+    grape:    (c,w,h) => { const g=c.createLinearGradient(0,0,w,h); g.addColorStop(0,'#5f2c82'); g.addColorStop(1,'#c471ed'); return g; },
+    graphite: (c,w,h) => { const g=c.createLinearGradient(0,0,w,h); g.addColorStop(0,'#2c3140'); g.addColorStop(1,'#0f1419'); return g; },
+    snow:     (c,w,h) => '#f1f1f4',
+  };
+  const BG_SWATCHES = {
+    aurora:'linear-gradient(135deg,#6C5CE7,#00B4D8)', sunset:'linear-gradient(135deg,#FF6B6B,#FFB36B)',
+    ocean:'linear-gradient(135deg,#2193b0,#6dd5ed)', grape:'linear-gradient(135deg,#5f2c82,#c471ed)',
+    graphite:'linear-gradient(135deg,#2c3140,#0f1419)', snow:'#f1f1f4',
+  };
+
+  // Cam sizes as % of container's shorter side — adapts to all ratios
+  const camSizePercent = { s: 0.18, m: 0.25, l: 0.35 };
+
+  function getCamPx(sizeKey) {
+    const cw = previewContainer.offsetWidth;
+    const ch = previewContainer.offsetHeight;
+    const base = Math.min(cw, ch);
+    return Math.round(base * (camSizePercent[sizeKey] || 0.18));
+  }
+
+  function applyCamSize() {
+    const sz = getCamPx(S.camSize);
+    camPip.style.width = sz + 'px';
+    camPip.style.height = sz + 'px';
+  }
+
+  // ============ DOM refs ============
+  const screenVideo = $('screenVideo');
+  const camVideo = $('camVideo');
+  const canvas = $('previewCanvas');
+  const ctx = canvas.getContext('2d');
+  const placeholder = $('placeholder');
+  const previewContainer = $('previewContainer');
+  const cropOverlay = $('cropOverlay');
+  const cropBox = $('cropBox');
+  const cropMaskHole = $('cropMaskHole');
+  const cropSizeLabel = $('cropSizeLabel');
+  const camPip = $('camPip');
+  const camPipVideo = $('camPipVideo');
+  const camPreviewFull = $('camPreviewFull');
+  const camPreviewVideo = $('camPreviewVideo');
+  const countdownOverlay = $('countdownOverlay');
+  const countdownNum = $('countdownNum');
+  const controlsPanel = $('controlsPanel');
+  const donePage = $('donePage');
+  const doneVideo = $('doneVideo');
+  const timerEl = $('timer');
+  const floatBar = $('floatBar');
+  const floatTimer = $('floatTimer');
+  const errorToast = $('errorToast');
+
+  // ============ Error Toast ============
+  function showError(msg) {
+    errorToast.textContent = msg;
+    errorToast.classList.add('show');
+    setTimeout(() => errorToast.classList.remove('show'), 4000);
+  }
+
+  // ============ Camera Auto-Open ============
+  async function openCamera() {
+    if (S.camReady) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showError('当前环境不支持摄像头，请下载此页面后在 localhost 打开');
+      return;
+    }
+    try {
+      S.camStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 640 }, facingMode: 'user' },
+        audio: false
+      });
+      camVideo.srcObject = S.camStream;
+      camPipVideo.srcObject = S.camStream;
+      camPreviewVideo.srcObject = S.camStream;
+      await camVideo.play();
+      await camPipVideo.play();
+      await camPreviewVideo.play();
+      S.camReady = true;
+      updateCamUI();
+    } catch (e) {
+      console.warn('Camera error:', e);
+      showError('无法打开摄像头，请检查权限设置');
+    }
+  }
+
+  function closeCamera() {
+    if (S.camStream) {
+      S.camStream.getTracks().forEach(t => t.stop());
+      S.camStream = null;
+    }
+    S.camReady = false;
+    camVideo.srcObject = null;
+    camPipVideo.srcObject = null;
+    camPreviewVideo.srcObject = null;
+    updateCamUI();
+  }
+
+  function updateCamUI() {
+    const needsCam = S.mode === 'screen_cam' || S.mode === 'cam';
+    if (!needsCam || !S.camReady) {
+      camPip.style.display = 'none';
+      camPreviewFull.style.display = 'none';
+      previewContainer.style.background = '#000';
+      if (!S.recording) stopCamSolidPreview();
+      if (!needsCam) placeholder.style.display = '';
+      return;
+    }
+    camPreviewVideo.style.transform = S.mirror ? 'scaleX(-1)' : '';
+    camPipVideo.style.transform = S.mirror ? 'scaleX(-1)' : '';
+    if (S.mode === 'cam') {
+      placeholder.style.display = 'none';
+      if (S.camBg === 'fill') {
+        // Cam-only fill: face fills the whole frame
+        if (!S.recording) stopCamSolidPreview();
+        camPreviewFull.style.display = '';
+        camPip.style.display = 'none';
+        previewContainer.style.background = '#000';
+      } else {
+        // Cam-only solid: pure-color background + draggable face avatar
+        camPreviewFull.style.display = 'none';
+        camPip.style.display = '';
+        // Letterbox stays dark so the white/colored fill only shows inside the
+        // actual recording frame (the canvas), not the whole preview area.
+        previewContainer.style.background = '#000';
+        if (!S.recording) startCamSolidPreview();
+      }
+    } else {
+      // screen_cam: only show the small circle, no full-screen face
+      if (!S.recording) stopCamSolidPreview();
+      camPreviewFull.style.display = 'none';
+      camPip.style.display = '';
+      previewContainer.style.background = '#000';
+    }
+  }
+
+  // Live WYSIWYG preview for cam-solid mode: canvas shows color bg + avatar
+  function startCamSolidPreview() {
+    setupCanvas();
+    ratioIndicator.style.display = 'none';
+    cancelAnimationFrame(S.animFrame);
+    renderLoop();
+  }
+  function stopCamSolidPreview() {
+    if (S.recording) return;
+    cancelAnimationFrame(S.animFrame);
+    canvas.width = 0;
+    canvas.height = 0;
+  }
+  // Place the avatar in the bottom-right of the recorded frame
+  function positionPipBottomRight() {
+    applyCamSize();
+    const hasCanvas = canvas.width > 0;
+    const refL = hasCanvas ? canvas.offsetLeft : 0;
+    const refT = hasCanvas ? canvas.offsetTop : 0;
+    const refW = hasCanvas ? canvas.offsetWidth : previewContainer.offsetWidth;
+    const refH = hasCanvas ? canvas.offsetHeight : previewContainer.offsetHeight;
+    const m = 16;
+    camPip.style.left = (refL + refW - camPip.offsetWidth - m) + 'px';
+    camPip.style.top = (refT + refH - camPip.offsetHeight - m) + 'px';
+    camPip.style.right = 'auto';
+    camPip.style.bottom = 'auto';
+  }
+
+  // ============ Mode Tabs ============
+  document.querySelectorAll('.mode-tab').forEach(tab => {
+    tab.addEventListener('click', async () => {
+      if (S.recording) return;
+      document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      S.mode = tab.dataset.mode;
+
+      if (S.mode === 'screen_cam' || S.mode === 'cam') {
+        await openCamera();
+      } else {
+        closeCamera();
+      }
+      updateCamUI();
+      $('camControlRow').style.display = S.mode === 'screen' ? 'none' : '';
+      $('beautyRow').style.display = S.mode === 'screen' ? 'none' : '';
+      $('camBgRow').style.display = S.mode === 'cam' ? '' : 'none';
+      $('camClickZoomRow').style.display = S.mode === 'cam' ? '' : 'none';
+      $('bgRow').style.display = S.mode === 'cam' ? 'none' : '';
+      $('azRow').style.display = S.mode === 'cam' ? 'none' : '';
+      $('cursorRow').style.display = S.mode === 'cam' ? 'none' : '';
+      $('cursorPlusRow').style.display = S.mode === 'cam' ? 'none' : '';
+      const sb = $('startBtn');
+      if (!S.recording && (S.uiState === 'A' || !S.uiState)) {
+        sb.innerHTML = '<div class="rec-dot"></div>' + (S.mode === 'cam' ? '开始录制' : '选择屏幕');
+      }
+    });
+  });
+
+  // Auto-open camera on load since default mode is screen_cam
+  setTimeout(() => { openCamera(); updatePreviewShape(); applyCamSize(); }, 300);
+
+  // ============ Preview Shape by Ratio ============
+  const ratioIndicator = $('ratioIndicator');
+
+  function updatePreviewShape() {
+    const [rw, rh] = S.ratio;
+    const aspect = rw / rh;
+    const containerW = previewContainer.parentElement.offsetWidth;
+    // Max height 520, min 280
+    const maxH = 520, minH = 280;
+    let h, w;
+
+    if (aspect >= 1) {
+      // Landscape or square
+      w = containerW;
+      h = Math.round(w / aspect);
+      h = Math.max(minH, Math.min(maxH, h));
+    } else {
+      // Portrait (9:16, 3:4 etc)
+      h = maxH;
+      w = Math.round(h * aspect);
+      w = Math.min(containerW, w);
+    }
+
+    previewContainer.style.height = h + 'px';
+    previewContainer.style.minHeight = h + 'px';
+
+    // Show ratio indicator frame
+    const cw = previewContainer.offsetWidth;
+    const ch = h;
+    let iw, ih;
+    if (cw / ch > aspect) {
+      ih = ch * 0.92;
+      iw = ih * aspect;
+    } else {
+      iw = cw * 0.92;
+      ih = iw / aspect;
+    }
+    ratioIndicator.style.width = iw + 'px';
+    ratioIndicator.style.height = ih + 'px';
+    ratioIndicator.style.top = ((ch - ih) / 2) + 'px';
+    ratioIndicator.style.left = '50%';
+    ratioIndicator.style.transform = 'translateX(-50%)';
+    ratioIndicator.style.display = '';
+
+    // Update cam preview video aspect if in cam mode
+    if (S.mode === 'cam' && camPreviewFull.style.display !== 'none') {
+      camPreviewVideo.style.objectFit = 'cover';
+    }
+
+    // Resize cam circle to match new ratio, then clamp position
+    applyCamSize();
+    const maxX = previewContainer.offsetWidth - camPip.offsetWidth;
+    const maxY = previewContainer.offsetHeight - camPip.offsetHeight;
+    if (camPip.offsetLeft > maxX) { camPip.style.left = Math.max(0, maxX) + 'px'; camPip.style.right = 'auto'; }
+    if (camPip.offsetTop > maxY) { camPip.style.top = Math.max(0, maxY) + 'px'; camPip.style.bottom = 'auto'; }
+  }
+
+  // ============ Ratio Buttons ============
+  function updateRatioPreview() {
+    const rp = $('ratioPreview');
+    if (!rp) return;
+    const [rw, rh] = S.ratio;
+    const max = 26;
+    const aspect = rw / rh;
+    const w = aspect >= 1 ? max : max * aspect;
+    const h = aspect >= 1 ? max / aspect : max;
+    rp.style.width = Math.round(w) + 'px';
+    rp.style.height = Math.round(h) + 'px';
+    rp.title = `当前比例 ${rw}:${rh}`;
+  }
+  document.querySelectorAll('.ratio-btn[data-ratio]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (S.recording) return;
+      document.querySelectorAll('.ratio-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const r = btn.dataset.ratio;
+      if (r === 'custom') {
+        $('customRatioInput').classList.add('show');
+      } else {
+        $('customRatioInput').classList.remove('show');
+        S.ratio = r.split(':').map(Number);
+        updatePreviewShape();
+        updateCropToRatio();
+        updateRatioPreview();
+      }
+    });
+  });
+
+  $('customApply').addEventListener('click', () => {
+    const w = parseInt($('customW').value) || 16;
+    const h = parseInt($('customH').value) || 9;
+    S.ratio = [w, h];
+    updatePreviewShape();
+    updateCropToRatio();
+    updateRatioPreview();
+  });
+  updateRatioPreview();
+
+  // ============ Cam Shape ============
+  document.querySelectorAll('[data-shape]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-shape]').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+      S.camShape = btn.dataset.shape;
+      camPip.classList.toggle('circle', S.camShape === 'circle');
+      camPip.classList.toggle('square', S.camShape === 'square');
+    });
+  });
+
+  // ============ Cam Size ============
+  document.querySelectorAll('[data-camsize]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-camsize]').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+      S.camSize = btn.dataset.camsize;
+      applyCamSize();
+    });
+  });
+
+  // ============ Mirror ============
+  $('mirrorBtn').addEventListener('click', () => {
+    S.mirror = !S.mirror;
+    $('mirrorBtn').classList.toggle('on', S.mirror);
+    camPipVideo.style.transform = S.mirror ? 'scaleX(-1)' : '';
+    camPreviewVideo.style.transform = S.mirror ? 'scaleX(-1)' : '';
+  });
+
+  // ============ Cam Background (cam-only mode) ============
+  function selectCamBg(value, fromCustom) {
+    const wasFill = S.camBg === 'fill';
+    document.querySelectorAll('[data-bg]').forEach(b => b.classList.remove('on'));
+    $('camBgCustomLabel').classList.remove('on');
+    if (fromCustom) {
+      $('camBgCustomLabel').classList.add('on');
+    } else {
+      const btn = document.querySelector(`[data-bg="${value}"]`);
+      if (btn) btn.classList.add('on');
+    }
+    S.camBg = value;
+    updateCamUI();
+    // Default the avatar to bottom-right the first time a color is chosen
+    if (wasFill && value !== 'fill' && !S.recording) positionPipBottomRight();
+  }
+  document.querySelectorAll('[data-bg]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (S.recording) return;
+      selectCamBg(btn.dataset.bg, false);
+    });
+  });
+  $('camBgColor').addEventListener('input', e => {
+    if (S.recording) return;
+    selectCamBg(e.target.value, true);
+  });
+
+  // ============ Cam Click-Zoom toggle ============
+  document.querySelectorAll('[data-camzoom]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-camzoom]').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+      S.camZoomClick = btn.dataset.camzoom === 'on';
+    });
+  });
+
+  // ============ Screen Studio Cinematic Background ============
+  // Screen Studio 风格电影背景：录屏内容缩进 + 渐变背景 + 圆角 + 柔和投影。
+  // 纯 canvas 后期合成，不依赖任何后台。仅作用于屏幕类模式(screen / screen_cam)。
+  const BG_PAD = { s: 0.035, m: 0.055, l: 0.09 };
+  (function initBgSwatches() {
+    const wrap = $('bgSwatches');
+    Object.keys(BG_SWATCHES).forEach(key => {
+      const sw = document.createElement('div');
+      sw.className = 'bg-sw' + (key === S.bg.preset ? ' active' : '');
+      sw.style.background = BG_SWATCHES[key];
+      sw.dataset.bgpreset = key;
+      sw.title = key;
+      sw.addEventListener('click', () => {
+        if (S.recording) return;
+        document.querySelectorAll('.bg-sw').forEach(s => s.classList.remove('active'));
+        sw.classList.add('active');
+        S.bg.preset = key;
+        if (!S.bg.enabled) setBgEnabled(true); // 选背景即开启效果
+      });
+      wrap.appendChild(sw);
+    });
+  })();
+  function setBgEnabled(on) {
+    S.bg.enabled = on;
+    document.querySelectorAll('[data-bgframe]').forEach(b =>
+      b.classList.toggle('on', b.dataset.bgframe === (on ? 'on' : 'off')));
+  }
+  document.querySelectorAll('[data-bgframe]').forEach(btn => {
+    btn.addEventListener('click', () => { if (!S.recording) setBgEnabled(btn.dataset.bgframe === 'on'); });
+  });
+  document.querySelectorAll('[data-bgpad]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (S.recording) return;
+      document.querySelectorAll('[data-bgpad]').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+      S.bg.padding = BG_PAD[btn.dataset.bgpad] || 0.055;
+    });
+  });
+
+  // ============ Screen Studio Smart Auto-Zoom ============
+  document.querySelectorAll('[data-az]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-az]').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+      S.az.enabled = btn.dataset.az === 'on';
+      if (S.az.enabled) { S.az.level = 1; S.az.lastT = 0; S.az.lastActivity = -1e9; }
+      if (!S.fx.wsConnected && S.az.enabled) {
+        showError('智能变焦需要鼠标后台 cursor_tracker.py（右上角显示「后台未连接」）。后台连上后才会推近/拉远。');
+      }
+    });
+  });
+  document.querySelectorAll('[data-azmax]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-azmax]').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+      S.az.max = parseFloat(btn.dataset.azmax) || 1.8;
+    });
+  });
+
+  // ============ Custom Fake Cursor (selectable style) ============
+  document.querySelectorAll('[data-cursor]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-cursor]').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+      const v = btn.dataset.cursor;
+      if (v === 'off') {
+        S.cursorFx.enabled = false;
+      } else {
+        S.cursorFx.enabled = true;
+        S.cursorFx.style = v;
+        S.cursorFx.has = false; // 重新吸附到当前坐标，避免从旧位置滑入
+      }
+      if (S.cursorFx.enabled && !S.fx.wsConnected) {
+        showError('自定义光标需要鼠标后台 cursor_tracker.py（右上角显示「后台未连接」）。');
+      }
+    });
+  });
+
+  // ============ Cursor Enhancements (spotlight / click sound / idle-hide) ============
+  document.querySelectorAll('[data-enh]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const k = btn.dataset.enh;
+      let on;
+      if (k === 'spot') on = (S.spot.enabled = !S.spot.enabled);
+      else if (k === 'sound') on = (S.clickSound.enabled = !S.clickSound.enabled);
+      else on = (S.cursorFx.idleHide = !S.cursorFx.idleHide);
+      btn.classList.toggle('on', on);
+      if (on && !S.fx.wsConnected) {
+        showError('该效果需要鼠标后台 cursor_tracker.py（右上角显示「后台未连接」）。');
+      }
+    });
+  });
+
+  // ============ Audio Toggles ============
+  $('micBtn').addEventListener('click', () => {
+    S.mic = !S.mic;
+    $('micBtn').classList.toggle('on', S.mic);
+  });
+  $('sysAudioBtn').addEventListener('click', () => {
+    S.sysAudio = !S.sysAudio;
+    $('sysAudioBtn').classList.toggle('on', S.sysAudio);
+  });
+
+  // ============ Cam PiP Drag ============
+  let pipDrag = { active: false, ox: 0, oy: 0 };
+  camPip.addEventListener('mousedown', e => {
+    if (e.target.closest('.cam-pip-controls')) return;
+    const rect = camPip.getBoundingClientRect();
+    const parentRect = previewContainer.getBoundingClientRect();
+    pipDrag.active = true;
+    pipDrag.ox = e.clientX - (rect.left - parentRect.left);
+    pipDrag.oy = e.clientY - (rect.top - parentRect.top);
+    camPip.classList.add('dragging');
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!pipDrag.active) return;
+    const parent = previewContainer;
+    let x = e.clientX - pipDrag.ox;
+    let y = e.clientY - pipDrag.oy;
+    // In cam-solid mode, clamp to the recorded frame (canvas) so the avatar
+    // can't be dragged into the letterbox area that won't be captured.
+    let minX = 0, minY = 0;
+    let maxX = parent.offsetWidth - camPip.offsetWidth;
+    let maxY = parent.offsetHeight - camPip.offsetHeight;
+    if (S.mode === 'cam' && S.camBg !== 'fill' && canvas.width > 0) {
+      minX = canvas.offsetLeft;
+      minY = canvas.offsetTop;
+      maxX = canvas.offsetLeft + canvas.offsetWidth - camPip.offsetWidth;
+      maxY = canvas.offsetTop + canvas.offsetHeight - camPip.offsetHeight;
+    }
+    x = Math.max(minX, Math.min(maxX, x));
+    y = Math.max(minY, Math.min(maxY, y));
+    camPip.style.left = x + 'px';
+    camPip.style.top = y + 'px';
+    camPip.style.bottom = 'auto';
+    camPip.style.right = 'auto';
+  });
+  document.addEventListener('mouseup', () => {
+    pipDrag.active = false;
+    camPip.classList.remove('dragging');
+  });
+
+  // ============ Crop Box ============
+  let cropDrag = { active: false, type: '', startX: 0, startY: 0, origRect: null };
+
+  function initCrop() {
+    const cw = previewContainer.offsetWidth;
+    const ch = previewContainer.offsetHeight;
+    const [rw, rh] = S.ratio;
+    const aspect = rw / rh;
+    let bw, bh;
+    if (cw / ch > aspect) {
+      bh = ch * 0.85;
+      bw = bh * aspect;
+    } else {
+      bw = cw * 0.85;
+      bh = bw / aspect;
+    }
+    S.cropRect = { x: (cw - bw) / 2, y: (ch - bh) / 2, w: bw, h: bh };
+    applyCrop();
+    cropOverlay.classList.add('active');
+  }
+
+  function updateCropToRatio() {
+    if (!cropOverlay.classList.contains('active') && !S.screenStream) return;
+    if (S.screenStream) initCrop();
+  }
+
+  function applyCrop() {
+    const r = S.cropRect;
+    cropBox.style.left = r.x + 'px';
+    cropBox.style.top = r.y + 'px';
+    cropBox.style.width = r.w + 'px';
+    cropBox.style.height = r.h + 'px';
+    cropMaskHole.setAttribute('x', r.x);
+    cropMaskHole.setAttribute('y', r.y);
+    cropMaskHole.setAttribute('width', r.w);
+    cropMaskHole.setAttribute('height', r.h);
+    if (screenVideo.videoWidth) {
+      const scaleX = screenVideo.videoWidth / previewContainer.offsetWidth;
+      const scaleY = screenVideo.videoHeight / previewContainer.offsetHeight;
+      cropSizeLabel.textContent = `${Math.round(r.w * scaleX)} × ${Math.round(r.h * scaleY)}`;
+    } else {
+      cropSizeLabel.textContent = `${Math.round(r.w)} × ${Math.round(r.h)}`;
+    }
+  }
+
+  cropBox.addEventListener('mousedown', e => {
+    if (e.target.classList.contains('crop-handle')) {
+      cropDrag = { active: true, type: e.target.dataset.dir, startX: e.clientX, startY: e.clientY, origRect: { ...S.cropRect } };
+    } else {
+      cropDrag = { active: true, type: 'move', startX: e.clientX, startY: e.clientY, origRect: { ...S.cropRect } };
+    }
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!cropDrag.active) return;
+    const dx = e.clientX - cropDrag.startX;
+    const dy = e.clientY - cropDrag.startY;
+    const o = cropDrag.origRect;
+    const cw = previewContainer.offsetWidth;
+    const ch = previewContainer.offsetHeight;
+    const aspect = S.ratio[0] / S.ratio[1];
+
+    if (cropDrag.type === 'move') {
+      S.cropRect.x = Math.max(0, Math.min(cw - o.w, o.x + dx));
+      S.cropRect.y = Math.max(0, Math.min(ch - o.h, o.y + dy));
+    } else {
+      let nw, nh, nx, ny;
+      if (cropDrag.type === 'br') { nw = Math.max(60, o.w + dx); nh = nw / aspect; nx = o.x; ny = o.y; }
+      else if (cropDrag.type === 'bl') { nw = Math.max(60, o.w - dx); nh = nw / aspect; nx = o.x + o.w - nw; ny = o.y; }
+      else if (cropDrag.type === 'tr') { nw = Math.max(60, o.w + dx); nh = nw / aspect; nx = o.x; ny = o.y + o.h - nh; }
+      else if (cropDrag.type === 'tl') { nw = Math.max(60, o.w - dx); nh = nw / aspect; nx = o.x + o.w - nw; ny = o.y + o.h - nh; }
+      if (nx < 0) { nw += nx; nh = nw / aspect; nx = 0; }
+      if (ny < 0) { nh += ny; nw = nh * aspect; ny = 0; }
+      if (nx + nw > cw) { nw = cw - nx; nh = nw / aspect; }
+      if (ny + nh > ch) { nh = ch - ny; nw = nh * aspect; }
+      S.cropRect = { x: nx, y: ny, w: nw, h: nh };
+    }
+    applyCrop();
+  });
+
+  document.addEventListener('mouseup', () => { cropDrag.active = false; });
+  cropBox.addEventListener('dblclick', () => { initCrop(); });
+
+  // ============ Start / Stop / Pause ============
+  $('startBtn').addEventListener('click', () => {
+    if (S.uiState === 'D') togglePause();
+    else enterSetupPhase();
+  });
+  $('confirmBtn').addEventListener('click', confirmAndRecord);
+  $('pauseBtn').addEventListener('click', togglePause);
+  $('stopBtn').addEventListener('click', stopRecording);
+  $('floatPauseBtn').addEventListener('click', togglePause);
+  $('floatStopBtn').addEventListener('click', stopRecording);
+  $('recBarPause').addEventListener('click', togglePause);
+  $('recBarStop').addEventListener('click', stopRecording);
+  $('downloadBtn').addEventListener('click', downloadVideo);
+  $('redoBtn').addEventListener('click', resetToReady);
+
+  // -------- Phase 1: Select screen, show live preview for adjustment --------
+  async function enterSetupPhase() {
+    $('startBtn').disabled = true;
+    $('startBtn').textContent = '选择中...';
+    try {
+      if (S.mode === 'cam') {
+        if (!S.camReady) await openCamera();
+        await actuallyStartRecording();
+        return;
+      }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        showError('当前环境不支持屏幕录制。请下载此页面，在本地 localhost 打开使用');
+        resetBtnState();
+        return;
+      }
+      try {
+        S.screenStream = await navigator.mediaDevices.getDisplayMedia({
+          // 开了自定义光标就请求隐藏系统光标，避免与画上去的假光标重影
+          // (能否隐藏取决于浏览器/采集对象，全屏采集部分平台可能仍显示)
+          video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 }, cursor: S.cursorFx.enabled ? 'never' : 'always' },
+          audio: S.sysAudio
+        });
+      } catch (e) {
+        if (e.name === 'NotAllowedError') showError('屏幕录制被拒绝');
+        else showError('屏幕录制失败: ' + e.message);
+        resetBtnState();
+        return;
+      }
+      screenVideo.srcObject = S.screenStream;
+      screenVideo.classList.add('previewing');
+      await screenVideo.play();
+      S.screenStream.getVideoTracks()[0].addEventListener('ended', () => {
+        if (S.recording) stopRecording();
+        else exitSetupPhase();
+      });
+      if (S.mode === 'screen_cam' && !S.camReady) await openCamera();
+      placeholder.style.display = 'none';
+      camPreviewFull.style.display = 'none';
+      ratioIndicator.style.display = 'none';
+      await new Promise(r => setTimeout(r, 300));
+      initCrop();
+      if (S.mode === 'screen_cam' && S.camReady) {
+        camPip.style.display = '';
+        camPip.style.zIndex = '20';
+      }
+      setUiState('B');
+      showPenToolbar(true);
+    } catch (err) {
+      showError('准备失败: ' + err.message);
+      resetBtnState();
+    }
+  }
+
+  function exitSetupPhase() {
+    screenVideo.classList.remove('previewing');
+    screenVideo.srcObject = null;
+    if (S.screenStream) { S.screenStream.getTracks().forEach(t => t.stop()); S.screenStream = null; }
+    cropOverlay.classList.remove('active');
+    $('confirmBtn').style.display = 'none';
+    $('setupHint').style.display = 'none';
+    placeholder.style.display = '';
+    ratioIndicator.style.display = '';
+    resetBtnState();
+    updateCamUI();
+  }
+
+  // -------- Phase 2: Confirm adjustment, start actual recording --------
+  async function confirmAndRecord() {
+    $('confirmBtn').disabled = true;
+    $('confirmBtn').textContent = '准备中...';
+    try { await actuallyStartRecording(); }
+    catch (err) { showError('录制启动失败: ' + err.message); exitSetupPhase(); }
+  }
+
+  async function actuallyStartRecording() {
+    if (S.mode !== 'screen' && !S.camReady) await openCamera();
+    if (S.mic) {
+      try { S.micStream = await navigator.mediaDevices.getUserMedia({ audio: true }); startMicLevel(); }
+      catch (e) { S.micStream = null; }
+    }
+    $('confirmBtn').style.display = 'none';
+    $('setupHint').style.display = 'none';
+    if (S.mode !== 'cam') screenVideo.classList.remove('previewing');
+    placeholder.style.display = 'none';
+    camPreviewFull.style.display = 'none';
+    if (S.mode === 'screen_cam' && S.camReady) camPip.style.display = '';
+    if (S.mode === 'cam' && S.camBg !== 'fill') {
+      camPip.style.display = '';
+      previewContainer.style.background = '#000';
+    }
+    setupCanvas();
+    await doCountdown();
+    cropOverlay.classList.remove('active');
+    ratioIndicator.style.display = 'none';
+    cancelAnimationFrame(S.animFrame); // stop any preview loop before the record loop
+    renderLoop();
+
+    const canvasStream = canvas.captureStream(30);
+    const audioCtx = new AudioContext();
+    const dest = audioCtx.createMediaStreamDestination();
+    S.audioCtx = audioCtx; S.recDest = dest; // 供点击音效注入
+    let hasAudio = false;
+    if (S.sysAudio && S.screenStream) {
+      const sysTracks = S.screenStream.getAudioTracks();
+      if (sysTracks.length > 0) { audioCtx.createMediaStreamSource(new MediaStream(sysTracks)).connect(dest); hasAudio = true; }
+    }
+    if (S.mic && S.micStream) { audioCtx.createMediaStreamSource(S.micStream).connect(dest); hasAudio = true; }
+    if (S.clickSound.enabled) hasAudio = true; // 即使无麦/系统声,也要保留音轨给咔哒声
+    const tracks = [...canvasStream.getVideoTracks()];
+    if (hasAudio) tracks.push(...dest.stream.getAudioTracks());
+
+    // Prefer MP4 (Chrome 120+), fallback to WebM
+    let mimeType = '';
+    const tryTypes = [
+      'video/mp4;codecs=avc1,mp4a.40.2',
+      'video/mp4',
+      'video/webm;codecs=h264,opus',
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm'
+    ];
+    for (const t of tryTypes) { if (MediaRecorder.isTypeSupported(t)) { mimeType = t; break; } }
+    S.isMP4 = mimeType.startsWith('video/mp4');
+    S.recorder = new MediaRecorder(new MediaStream(tracks), { mimeType, videoBitsPerSecond: 8000000 });
+    S.chunks = [];
+    S.recorder.ondataavailable = e => { if (e.data.size > 0) S.chunks.push(e.data); };
+    S.recorder.onstop = onRecordingDone;
+    S.recorder.start(1000);
+    S.recording = true;
+    S.paused = false;
+    S.startTime = Date.now();
+    S.elapsed = 0;
+    startTimer();
+
+    setUiState('C');
+    floatBar.classList.add('show');
+    $('recBar').classList.add('show');
+    await launchPip();
+  }
+
+  // Central UI state machine.
+  // 'A' idle (no source) | 'B' source ready | 'C' recording | 'D' paused
+  function setUiState(state) {
+    S.uiState = state;
+    const sb = $('startBtn'), cb = $('confirmBtn'), pb = $('pauseBtn'), stb = $('stopBtn');
+    const hint = $('setupHint'), ph = $('placeholder'), pht = $('placeholderText');
+    const appEl = $('app');
+    if (appEl) appEl.classList.toggle('is-recording', state === 'C' || state === 'D');
+    // Reset
+    sb.classList.remove('recording', 'paused');
+    sb.disabled = false;
+    cb.disabled = false;
+    if (state === 'A') {
+      sb.style.display = '';
+      sb.innerHTML = '<div class="rec-dot"></div>' + (S.mode === 'cam' ? '开始录制' : '选择屏幕');
+      cb.style.display = 'none';
+      cb.innerHTML = '<div class="rec-dot"></div>开始录制';
+      pb.disabled = true; pb.textContent = '暂停';
+      stb.disabled = true;
+      hint.style.display = 'none';
+      if (pht) pht.textContent = '① 选择录制模式 → ② 选择屏幕源 → ③ 开始录制';
+      if (ph) ph.style.display = '';
+    } else if (state === 'B') {
+      sb.style.display = 'none';
+      cb.style.display = '';
+      cb.innerHTML = '<div class="rec-dot"></div>开始录制';
+      pb.disabled = true; pb.textContent = '暂停';
+      stb.disabled = true;
+      hint.style.display = '';
+      hint.textContent = '准备就绪，点击下方「开始录制」（可拖动裁切框调整范围）';
+    } else if (state === 'C') {
+      sb.style.display = '';
+      sb.classList.add('recording');
+      sb.disabled = true;
+      sb.innerHTML = '<div class="rec-dot"></div>录制中<span class="btn-timer" id="btnTimer">00:00:00</span>';
+      cb.style.display = 'none';
+      pb.disabled = false; pb.textContent = '暂停';
+      stb.disabled = false;
+      hint.style.display = 'none';
+      if (ph) ph.style.display = 'none';
+    } else if (state === 'D') {
+      sb.style.display = '';
+      sb.disabled = false;
+      sb.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0"><polygon points="6,4 20,12 6,20"/></svg>继续录制';
+      cb.style.display = 'none';
+      pb.disabled = false; pb.textContent = '继续';
+      stb.disabled = false;
+      hint.style.display = 'none';
+      if (ph) ph.style.display = 'none';
+    }
+  }
+  function resetBtnState() { setUiState('A'); }
+
+  function togglePause() {
+    if (!S.recorder) return;
+    if (S.paused) {
+      S.recorder.resume();
+      S.paused = false;
+      S.startTime = Date.now() - S.elapsed;
+      $('floatPauseBtn').textContent = '暂停';
+      $('recBarPause').textContent = '暂停';
+      $('recBarDot').classList.remove('paused');
+      timerEl.classList.add('active');
+      setUiState('C');
+    } else {
+      S.recorder.pause();
+      S.paused = true;
+      $('floatPauseBtn').textContent = '继续';
+      $('recBarPause').textContent = '继续';
+      $('recBarDot').classList.add('paused');
+      timerEl.classList.remove('active');
+      setUiState('D');
+    }
+  }
+
+  function stopRecording() {
+    if (S.recorder && S.recorder.state !== 'inactive') {
+      S.recorder.stop();
+    }
+    S.recording = false;
+    S.paused = false;
+    stopTimer();
+    cancelAnimationFrame(S.animFrame);
+    floatBar.classList.remove('show');
+    $('recBar').classList.remove('show');
+    closePip();
+  }
+
+  async function onRecordingDone() {
+    S.blob = new Blob(S.chunks, { type: S.recorder.mimeType });
+    const durationStr = formatTime(S.elapsed);
+
+    // Show done page first
+    $('previewSection').style.display = 'none';
+    controlsPanel.style.display = 'none';
+    donePage.classList.add('show');
+
+    if (S.isMP4) {
+      // Already MP4 — download directly
+      showDoneInfo(S.blob, durationStr, 'mp4');
+      downloadBlob(S.blob, 'mp4');
+    } else {
+      // WebM — try to convert to MP4
+      document.querySelector('.done-title').textContent = '正在转换为 MP4 格式...';
+      try {
+        const mp4Blob = await convertToMP4(S.blob);
+        S.blob = mp4Blob;
+        showDoneInfo(mp4Blob, durationStr, 'mp4');
+        downloadBlob(mp4Blob, 'mp4');
+      } catch (e) {
+        console.warn('MP4 conversion failed, keeping WebM:', e);
+        showDoneInfo(S.blob, durationStr, 'webm');
+        downloadBlob(S.blob, 'webm');
+      }
+    }
+    doneVideo.src = URL.createObjectURL(S.blob);
+    cleanupStreams();
+  }
+
+  function showDoneInfo(blob, duration, ext) {
+    const sizeBytes = blob.size;
+    const sizeStr = sizeBytes >= 1024 * 1024
+      ? (sizeBytes / (1024 * 1024)).toFixed(1) + ' MB'
+      : Math.round(sizeBytes / 1024) + ' KB';
+    document.querySelector('.done-title').textContent =
+      '录制完成 — ' + duration + ' / ' + sizeStr + ' / ' + ext.toUpperCase();
+  }
+
+  function downloadBlob(blob, ext) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const ts = new Date().toISOString().replace(/[T:]/g, '-').replace(/\..+/, '');
+    a.download = `FuYou录屏_${ts}.${ext}`;
+    a.click();
+  }
+
+  function downloadVideo() {
+    if (!S.blob) return;
+    const ext = S.blob.type.includes('mp4') ? 'mp4' : 'webm';
+    downloadBlob(S.blob, ext);
+  }
+
+  // Convert WebM to MP4 using FFmpeg.wasm (loaded on demand)
+  async function convertToMP4(webmBlob) {
+    // Load FFmpeg.wasm from CDN
+    if (!window.FFmpegWASM) {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.min.js';
+      document.head.appendChild(script);
+      await new Promise((resolve, reject) => {
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('FFmpeg 加载失败'));
+      });
+    }
+
+    const { FFmpeg } = FFmpegLib || window;
+    const ffmpeg = new FFmpeg();
+    await ffmpeg.load({
+      coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
+    });
+
+    const inputData = new Uint8Array(await webmBlob.arrayBuffer());
+    await ffmpeg.writeFile('input.webm', inputData);
+    await ffmpeg.exec(['-i', 'input.webm', '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-c:a', 'aac', '-movflags', '+faststart', 'output.mp4']);
+    const outputData = await ffmpeg.readFile('output.mp4');
+    return new Blob([outputData], { type: 'video/mp4' });
+  }
+
+  function resetToReady() {
+    donePage.classList.remove('show');
+    $('previewSection').style.display = '';
+    controlsPanel.style.display = '';
+    placeholder.style.display = '';
+    cropOverlay.classList.remove('active');
+    camPip.style.display = 'none';
+    camPreviewFull.style.display = 'none';
+
+    resetBtnState();
+    $('pauseBtn').disabled = true;
+    $('stopBtn').disabled = true;
+    $('pauseBtn').textContent = '暂停';
+    timerEl.textContent = '00:00:00';
+    timerEl.classList.remove('active');
+    doneVideo.src = '';
+    S.blob = null;
+    S.chunks = [];
+    S.camReady = false;
+    canvas.width = 0;
+    canvas.height = 0;
+
+    // Re-open camera if mode requires it
+    if (S.mode === 'screen_cam' || S.mode === 'cam') {
+      openCamera();
+    }
+    updatePreviewShape();
+  }
+
+  function cleanupStreams() {
+    if (S.screenStream) { S.screenStream.getTracks().forEach(t => t.stop()); S.screenStream = null; }
+    if (S.micStream) { S.micStream.getTracks().forEach(t => t.stop()); S.micStream = null; }
+    // Don't close cam here — we want it to stay open for preview
+    stopMicLevel();
+  }
+
+  // ============ Canvas Rendering ============
+  function setupCanvas() {
+    if (S.mode === 'cam') {
+      const [rw, rh] = S.ratio;
+      const baseH = 720;
+      canvas.width = Math.round(baseH * (rw / rh));
+      canvas.height = baseH;
+    } else {
+      const scaleX = screenVideo.videoWidth / previewContainer.offsetWidth;
+      const scaleY = screenVideo.videoHeight / previewContainer.offsetHeight;
+      canvas.width = Math.round(S.cropRect.w * scaleX);
+      canvas.height = Math.round(S.cropRect.h * scaleY);
+    }
+  }
+
+  function renderLoop() {
+    if (!S.recording && !S.screenStream && !S.camStream) return;
+    const cw = canvas.width, ch = canvas.height;
+    ctx.clearRect(0, 0, cw, ch);
+
+    if (S.mode === 'cam') {
+      if (S.camBg === 'fill') {
+        ctx.filter = getCamFilter();
+        drawCover(ctx, camVideo, 0, 0, cw, ch, S.mirror);
+        ctx.filter = 'none';
+      } else {
+        ctx.fillStyle = S.camBg;
+        ctx.fillRect(0, 0, cw, ch);
+        drawCamPipSolid(cw, ch);
+      }
+    } else {
+      const scaleX = screenVideo.videoWidth / previewContainer.offsetWidth;
+      const scaleY = screenVideo.videoHeight / previewContainer.offsetHeight;
+      const cr = S.cropRect;
+      let srcX = cr.x * scaleX, srcY = cr.y * scaleY;
+      let srcW = cr.w * scaleX, srcH = cr.h * scaleY;
+      // Resolve the active zoom: smart auto-zoom takes precedence over the
+      // discrete click-to-zoom so they never compound into a double zoom.
+      let zFactor = 1, zfx = 0.5, zfy = 0.5;
+      if (S.az.enabled && screenVideo.videoWidth) {
+        updateAutoZoom();
+        if (S.az.level > 1.001) { zFactor = S.az.level; zfx = S.az.fx; zfy = S.az.fy; }
+      } else if (S.fx.clickMode === 'zoom' && S.fx.zoomState && screenVideo.videoWidth) {
+        const z = computeZoomFactor();
+        if (z > 1.001) { zFactor = z; zfx = S.fx.zoomState.x; zfy = S.fx.zoomState.y; }
+      }
+      if (zFactor > 1.001) {
+        const fx = zfx * screenVideo.videoWidth;
+        const fy = zfy * screenVideo.videoHeight;
+        const newW = srcW / zFactor, newH = srcH / zFactor;
+        let newX = fx - (fx - srcX) / zFactor;
+        let newY = fy - (fy - srcY) / zFactor;
+        newX = Math.max(srcX, Math.min(srcX + srcW - newW, newX));
+        newY = Math.max(srcY, Math.min(srcY + srcH - newH, newY));
+        srcX = newX; srcY = newY; srcW = newW; srcH = newH;
+      }
+      S.fx._src = { x: srcX, y: srcY, w: srcW, h: srcH, vw: screenVideo.videoWidth, vh: screenVideo.videoHeight };
+      ctx.drawImage(screenVideo, srcX, srcY, srcW, srcH, 0, 0, cw, ch);
+      if (S.mode === 'screen_cam' && S.camStream) drawCamPip(cw, ch);
+    }
+    // Composite drawing annotations
+    if (drawCanvas.width > 0 && drawCanvas.height > 0) {
+      ctx.drawImage(drawCanvas, 0, 0, drawCanvas.width, drawCanvas.height, 0, 0, cw, ch);
+    }
+    // Spotlight / vignette: dim everything except a bright disc around the cursor
+    if (S.mode !== 'cam') drawSpotlight(cw, ch);
+    // Cursor FX overlay (after annotations so they sit on top)
+    if (S.mode !== 'cam') drawCursorEffects(cw, ch);
+    // Custom fake cursor (selectable style + click feedback), topmost over FX
+    if (S.mode !== 'cam') drawFakeCursor(cw, ch);
+    // Screen Studio cinematic frame: wrap the whole composited content in a
+    // padded, rounded, shadowed card on a gradient background (screen modes only).
+    if (S.bg.enabled && S.mode !== 'cam' && cw > 0 && ch > 0) applyBgFrame(cw, ch);
+    S.animFrame = requestAnimationFrame(renderLoop);
+  }
+
+  // Smart auto-zoom: ease the zoom level + focus each frame. Zooms IN toward the
+  // cursor while there's recent activity, holds, then eases back OUT when idle.
+  // Driven by cursor data from the cursor_tracker.py backend; with no backend
+  // connected lastActivity stays old, so it simply rests at 1x (no-op).
+  function updateAutoZoom() {
+    const az = S.az;
+    const now = performance.now();
+    const dt = az.lastT ? Math.min(100, now - az.lastT) : 16;
+    az.lastT = now;
+    const active = (now - az.lastActivity) < AUTOZOOM.HOLD_MS;
+    const targetLevel = active ? az.max : 1;
+    const tau = targetLevel > az.level ? AUTOZOOM.IN_TAU : AUTOZOOM.OUT_TAU;
+    az.level += (targetLevel - az.level) * (1 - Math.exp(-dt / tau));
+    if (!active && az.level < 1.002) az.level = 1;
+    // Focus glides toward the latest cursor target
+    const aF = 1 - Math.exp(-dt / AUTOZOOM.FOCUS_TAU);
+    az.fx += (az.tx - az.fx) * aF;
+    az.fy += (az.ty - az.fy) * aF;
+  }
+
+  // Post-process the already-composited canvas into a Screen Studio style card:
+  // snapshot content → repaint background → draw content inset + rounded + shadow.
+  function applyBgFrame(cw, ch) {
+    let buf = S.bg.buf || (S.bg.buf = document.createElement('canvas'));
+    if (buf.width !== cw || buf.height !== ch) { buf.width = cw; buf.height = ch; }
+    const bctx = buf.getContext('2d');
+    bctx.clearRect(0, 0, cw, ch);
+    bctx.drawImage(canvas, 0, 0);
+
+    // Paint the background fill across the whole frame
+    ctx.clearRect(0, 0, cw, ch);
+    const mk = BG_PRESETS[S.bg.preset] || BG_PRESETS.aurora;
+    ctx.fillStyle = mk(ctx, cw, ch);
+    ctx.fillRect(0, 0, cw, ch);
+
+    // Inset rect — uniform scale + centered so the screen aspect is preserved
+    const pad = Math.min(cw, ch) * S.bg.padding;
+    const scale = Math.min((cw - 2 * pad) / cw, (ch - 2 * pad) / ch);
+    const dw = cw * scale, dh = ch * scale;
+    const dx = (cw - dw) / 2, dy = (ch - dh) / 2;
+    const rad = Math.min(dw, dh) * S.bg.radius;
+
+    // Soft drop shadow under the card
+    if (S.bg.shadow) {
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.40)';
+      ctx.shadowBlur = pad * 0.85;
+      ctx.shadowOffsetY = pad * 0.22;
+      ctx.fillStyle = '#000';
+      roundRect(ctx, dx, dy, dw, dh, rad);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Clip to the rounded card and draw the snapshot scaled into it
+    ctx.save();
+    roundRect(ctx, dx, dy, dw, dh, rad);
+    ctx.clip();
+    ctx.drawImage(buf, 0, 0, cw, ch, dx, dy, dw, dh);
+    ctx.restore();
+  }
+
+  // Click-to-emphasize: avatar scales up on mouse click, holds, then eases
+  // back to 1.0 over ~2s. Returns the current scale factor (1.0 = no zoom).
+  const CAM_PULSE = { DUR: 2000, UP: 200, DOWN: 380, MAX: 0.28 };
+  function camPulseScale() {
+    if (!S.camZoomClick) return 1;
+    const dt = performance.now() - S.fx.camPulseT0;
+    if (dt < 0 || dt > CAM_PULSE.DUR) return 1;
+    let k;
+    if (dt < CAM_PULSE.UP) k = dt / CAM_PULSE.UP;                       // ease in
+    else if (dt < CAM_PULSE.DUR - CAM_PULSE.DOWN) k = 1;                // hold
+    else k = (CAM_PULSE.DUR - dt) / CAM_PULSE.DOWN;                     // ease out
+    k = k * k * (3 - 2 * k);                                            // smoothstep
+    return 1 + CAM_PULSE.MAX * k;
+  }
+
+  // Paint the webcam avatar (clipped circle/rounded square + border) at a
+  // given center/size in canvas pixels. Shared by screen_cam and cam-solid.
+  function paintCamAvatar(relCx, relCy, relSize) {
+    const relX = relCx - relSize / 2;
+    const relY = relCy - relSize / 2;
+    const rad = relSize * 0.14; // proportional rounding — matches CSS preview (14%)
+    const shape = () => {
+      ctx.beginPath();
+      if (S.camShape === 'circle') ctx.arc(relCx, relCy, relSize / 2, 0, Math.PI * 2);
+      else roundRect(ctx, relX, relY, relSize, relSize, rad);
+    };
+
+    // Soft drop shadow so the avatar sits naturally on the background
+    // (replaces the old hard sticker edge). Fill the shape to cast it.
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.22)';
+    ctx.shadowBlur = relSize * 0.08;
+    ctx.shadowOffsetY = relSize * 0.025;
+    ctx.fillStyle = '#000';
+    shape();
+    ctx.fill();
+    ctx.restore();
+
+    // Clip to shape and draw the webcam (covers the shadow-caster fill)
+    ctx.save();
+    ctx.filter = getCamFilter();
+    shape();
+    ctx.clip();
+    if (S.mirror) {
+      ctx.translate(relX + relSize, relY);
+      ctx.scale(-1, 1);
+      drawCover(ctx, camVideo, 0, 0, relSize, relSize, false);
+    } else {
+      drawCover(ctx, camVideo, relX, relY, relSize, relSize, false);
+    }
+    ctx.filter = 'none';
+    ctx.restore();
+
+    // Thin soft rim — subtle definition, not a hard white line
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+    ctx.lineWidth = Math.max(1, relSize * 0.006);
+    shape();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // screen_cam: avatar mapped from the crop rect
+  function drawCamPip(cw, ch) {
+    const pipX = camPip.offsetLeft, pipY = camPip.offsetTop;
+    const pipW = camPip.offsetWidth, pipH = camPip.offsetHeight;
+    const cr = S.cropRect;
+    const sx = cw / cr.w;
+    const sy = ch / cr.h;
+    // Force a square in canvas space — keeps the circle truly round
+    // even when scaleX != scaleY (caused by container vs video aspect mismatch).
+    const relSize = Math.round(((pipW * sx) + (pipH * sy)) / 2);
+    const relCx = (pipX + pipW / 2 - cr.x) * sx;
+    const relCy = (pipY + pipH / 2 - cr.y) * sy;
+    paintCamAvatar(relCx, relCy, relSize);
+  }
+
+  // cam-solid: avatar mapped from the displayed canvas rect (WYSIWYG)
+  function drawCamPipSolid(cw, ch) {
+    const dispW = canvas.offsetWidth, dispH = canvas.offsetHeight;
+    if (!dispW || !dispH) return;
+    const sx = cw / dispW, sy = ch / dispH;
+    const scale = camPulseScale();
+    const relSize = Math.round(((camPip.offsetWidth * sx) + (camPip.offsetHeight * sy)) / 2 * scale);
+    const relCx = (camPip.offsetLeft + camPip.offsetWidth / 2 - canvas.offsetLeft) * sx;
+    const relCy = (camPip.offsetTop + camPip.offsetHeight / 2 - canvas.offsetTop) * sy;
+    paintCamAvatar(relCx, relCy, relSize);
+    // Mirror the same pulse on the on-screen DOM avatar so preview == recording
+    camPip.style.transform = scale === 1 ? '' : 'scale(' + scale.toFixed(3) + ')';
+  }
+
+  function drawCover(ctx, video, x, y, w, h, mirror) {
+    if (!video.videoWidth) return;
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const vA = vw / vh, dA = w / h;
+    let sx = 0, sy = 0, sw = vw, sh = vh;
+    if (vA > dA) { sw = vh * dA; sx = (vw - sw) / 2; }
+    else { sh = vw / dA; sy = (vh - sh) / 2; }
+    if (mirror) {
+      ctx.save(); ctx.translate(x + w, y); ctx.scale(-1, 1);
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h); ctx.restore();
+    } else {
+      ctx.drawImage(video, sx, sy, sw, sh, x, y, w, h);
+    }
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+  }
+
+  // ============ Countdown ============
+  function doCountdown() {
+    return new Promise(resolve => {
+      countdownOverlay.classList.add('show');
+      let n = 3;
+      countdownNum.textContent = n;
+      const iv = setInterval(() => {
+        n--;
+        if (n <= 0) { clearInterval(iv); countdownOverlay.classList.remove('show'); resolve(); }
+        else {
+          countdownNum.textContent = n;
+          countdownNum.style.animation = 'none';
+          countdownNum.offsetHeight;
+          countdownNum.style.animation = '';
+        }
+      }, 800);
+    });
+  }
+
+  // ============ Timer ============
+  function startTimer() { timerEl.classList.add('active'); S.timerInterval = setInterval(updateTimer, 200); }
+  function stopTimer() { clearInterval(S.timerInterval); timerEl.classList.remove('active'); }
+  function updateTimer() {
+    if (S.paused) return;
+    S.elapsed = Date.now() - S.startTime;
+    const str = formatTime(S.elapsed);
+    timerEl.textContent = str;
+    floatTimer.textContent = str;
+    const bt = document.getElementById('btnTimer'); if (bt) bt.textContent = str;
+    const rbt = $('recBarTime'); if (rbt) rbt.textContent = str;
+  }
+  function formatTime(ms) {
+    const s = Math.floor(ms / 1000);
+    return [Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60].map(v => String(v).padStart(2, '0')).join(':');
+  }
+
+  // ============ Mic Level ============
+  let micAnalyser, micLevelFrame;
+  function startMicLevel() {
+    if (!S.micStream) return;
+    try {
+      const actx = new AudioContext();
+      const src = actx.createMediaStreamSource(S.micStream);
+      micAnalyser = actx.createAnalyser();
+      micAnalyser.fftSize = 256;
+      src.connect(micAnalyser);
+      const data = new Uint8Array(micAnalyser.frequencyBinCount);
+      (function draw() {
+        micAnalyser.getByteFrequencyData(data);
+        let sum = 0; for (let i = 0; i < data.length; i++) sum += data[i];
+        $('micLevelBar').style.width = Math.min(100, (sum / data.length / 128) * 100) + '%';
+        micLevelFrame = requestAnimationFrame(draw);
+      })();
+    } catch (e) {}
+  }
+  function stopMicLevel() { cancelAnimationFrame(micLevelFrame); $('micLevelBar').style.width = '0%'; }
+
+  // ============ Picture-in-Picture Mini Control ============
+  const pipCanvas = $('pipCanvas');
+  const pipCtx = pipCanvas.getContext('2d');
+  const pipVideo = $('pipVideo');
+  let pipAnimFrame = null;
+  let pipWindow = null;
+
+  // Draw the PiP control panel on a canvas
+  function drawPipControl() {
+    const w = 400, h = 160;
+    const pCtx = pipCtx;
+    // Background
+    pCtx.fillStyle = '#0B0D14';
+    pCtx.fillRect(0, 0, w, h);
+
+    // Gradient accent line at top
+    const grad = pCtx.createLinearGradient(0, 0, w, 0);
+    grad.addColorStop(0, '#6C5CE7');
+    grad.addColorStop(1, '#00B4D8');
+    pCtx.fillStyle = grad;
+    pCtx.fillRect(0, 0, w, 3);
+
+    // Recording dot (blink)
+    const blink = Math.sin(Date.now() / 300) > 0;
+    if (blink || S.paused) {
+      pCtx.fillStyle = S.paused ? '#FFB347' : '#FF4757';
+      pCtx.beginPath();
+      pCtx.arc(30, 50, 8, 0, Math.PI * 2);
+      pCtx.fill();
+    }
+
+    // Status text
+    pCtx.fillStyle = '#E8E8E8';
+    pCtx.font = 'bold 18px -apple-system, "Microsoft YaHei", sans-serif';
+    pCtx.fillText(S.paused ? '已暂停' : '录制中', 50, 56);
+
+    // Timer
+    pCtx.fillStyle = S.paused ? '#FFB347' : '#FF4757';
+    pCtx.font = 'bold 36px -apple-system, "Microsoft YaHei", sans-serif';
+    const timeStr = formatTime(S.elapsed);
+    pCtx.fillText(timeStr, 30, 110);
+
+    // Pause button area
+    pCtx.fillStyle = '#1a1e2e';
+    pCtx.beginPath();
+    roundRectPath(pCtx, 220, 75, 70, 40, 10);
+    pCtx.fill();
+    pCtx.fillStyle = '#E8E8E8';
+    pCtx.font = '14px -apple-system, "Microsoft YaHei", sans-serif';
+    pCtx.fillText(S.paused ? '继续' : '暂停', 234, 100);
+
+    // Stop button area
+    pCtx.fillStyle = '#1a1e2e';
+    pCtx.beginPath();
+    roundRectPath(pCtx, 305, 75, 70, 40, 10);
+    pCtx.fill();
+    pCtx.strokeStyle = '#FF4757';
+    pCtx.lineWidth = 1.5;
+    pCtx.beginPath();
+    roundRectPath(pCtx, 305, 75, 70, 40, 10);
+    pCtx.stroke();
+    pCtx.fillStyle = '#FF4757';
+    pCtx.font = '14px -apple-system, "Microsoft YaHei", sans-serif';
+    pCtx.fillText('停止', 319, 100);
+
+    // Brand
+    pCtx.fillStyle = '#8B8FA3';
+    pCtx.font = '11px -apple-system, "Microsoft YaHei", sans-serif';
+    pCtx.fillText('FuYou ScreenCap', 220, 56);
+
+    pipAnimFrame = requestAnimationFrame(drawPipControl);
+  }
+
+  function roundRectPath(ctx, x, y, w, h, r) {
+    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+  }
+
+  // ============ Recording Overlays ============
+  let ctrlWin = null;    // Control popup (window.open)
+  let camPipActive = false; // Webcam PiP (always-on-top)
+
+  async function launchPip() {
+    const sw = screen.availWidth;
+
+    // --- 1. Recording preview PiP (always on top!) ---
+    // Shows the full recording canvas: screen + webcam + annotations
+    try {
+      const recStream = canvas.captureStream(30);
+      pipCamFeed.srcObject = recStream;
+      await pipCamFeed.play();
+      await pipCamFeed.requestPictureInPicture();
+      camPipActive = true;
+      pipCamFeed.addEventListener('leavepictureinpicture', () => {
+        camPipActive = false;
+      }, { once: true });
+    } catch (e) {
+      console.warn('Recording PiP failed:', e);
+    }
+
+    // Show pen toolbar
+    showPenToolbar(true);
+
+    // --- 2. Controls: window.open popup ---
+    const cw = 280, ch = 70;
+    ctrlWin = window.open('', 'FuYouCtrl',
+      `width=${cw},height=${ch},left=${sw - cw - 20},top=20,menubar=no,toolbar=no,location=no,status=no,resizable=no,scrollbars=no`
+    );
+    if (ctrlWin) {
+      ctrlWin.document.write(`<!DOCTYPE html><html><head><style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{background:#0B0D14;color:#E8E8E8;font-family:-apple-system,"Microsoft YaHei",sans-serif;
+             display:flex;align-items:center;height:100vh;padding:8px 14px;gap:6px;user-select:none;overflow:hidden}
+        .dot{width:7px;height:7px;border-radius:50%;background:#FF4757;flex-shrink:0}
+        .dot.blink{animation:pulse 1.2s infinite}
+        .dot.paused{background:#FFB347;animation:none}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+        .time{font-size:11px;color:#FF4757;font-variant-numeric:tabular-nums;font-weight:500}
+        .time.paused{color:#FFB347}
+        .spacer{flex:1}
+        .btn{padding:5px 14px;border-radius:6px;font-size:12px;cursor:pointer;border:none;font-family:inherit;font-weight:500}
+        .btn-pause{background:#1a1e2e;color:#E8E8E8}.btn-pause:hover{background:#252a3a}
+        .btn-stop{background:rgba(255,71,87,0.12);color:#FF4757;border:1px solid rgba(255,71,87,0.4)}.btn-stop:hover{background:rgba(255,71,87,0.25)}
+        .line{position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#6C5CE7,#00B4D8)}
+      </style></head><body>
+        <div class="line"></div>
+        <div class="dot blink" id="d"></div>
+        <span class="time" id="t">00:00:00</span>
+        <span class="spacer"></span>
+        <button class="btn btn-pause" id="p">暂停</button>
+        <button class="btn btn-stop" id="s">停止</button>
+      </body></html>`);
+      ctrlWin.document.close();
+      ctrlWin.document.title = '录制控制';
+      ctrlWin.document.getElementById('p').onclick = () => { togglePause(); updatePopupUI(); };
+      ctrlWin.document.getElementById('s').onclick = () => { stopRecording(); };
+      ctrlWin.addEventListener('beforeunload', () => { ctrlWin = null; if (S.recording) stopRecording(); });
+    }
+
+    S.pipUpdateInterval = setInterval(updatePopupUI, 200);
+  }
+
+  function updatePopupUI() {
+    if (!ctrlWin || ctrlWin.closed) return;
+    try {
+      const t = ctrlWin.document.getElementById('t');
+      const d = ctrlWin.document.getElementById('d');
+      const p = ctrlWin.document.getElementById('p');
+      if (t) { t.textContent = formatTime(S.elapsed); t.className = 'time' + (S.paused ? ' paused' : ''); }
+      if (d) d.className = 'dot' + (S.paused ? ' paused' : ' blink');
+      if (p) p.textContent = S.paused ? '继续' : '暂停';
+    } catch (e) {}
+  }
+
+  function closePip() {
+    clearInterval(S.pipUpdateInterval);
+    cancelAnimationFrame(pipAnimFrame);
+    cancelAnimationFrame(pipCamFrame);
+    if (document.pictureInPictureElement) document.exitPictureInPicture().catch(() => {});
+    camPipActive = false;
+    pipVideo.srcObject = null;
+    pipCamFeed.srcObject = null;
+    if (ctrlWin && !ctrlWin.closed) { try { ctrlWin.close(); } catch (e) {} }
+    ctrlWin = null;
+    showPenToolbar(false);
+    penActive = false;
+    $('penToggle').classList.remove('active');
+    drawCanvas.classList.remove('active');
+  }
+
+  // ============ Beauty Filters ============
+  const beautyPresets = {
+    off:     'none',
+    natural: 'brightness(106%) contrast(104%) saturate(105%)',
+    white:   'brightness(115%) contrast(98%) saturate(88%)',
+    full:    'brightness(118%) contrast(103%) saturate(92%) blur(0.2px)',
+  };
+  S.beautyMode = 'natural';
+
+  function getCamFilter() {
+    return beautyPresets[S.beautyMode] || 'none';
+  }
+
+  function updateLiveCamFilter() {
+    const f = getCamFilter();
+    const css = f === 'none' ? '' : f;
+    camPipVideo.style.filter = css;
+    if (camPreviewVideo) camPreviewVideo.style.filter = css;
+  }
+
+  document.querySelectorAll('[data-beauty]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-beauty]').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+      S.beautyMode = btn.dataset.beauty;
+      updateLiveCamFilter();
+    });
+  });
+
+  // Init default
+  updateLiveCamFilter();
+
+  // ============ Drawing / Pen Tool ============
+  const drawCanvas = $('drawCanvas');
+  const drawCtx = drawCanvas.getContext('2d');
+  let penActive = false;
+  let penColor = '#FF4757';
+  let penSize = 3;
+  let drawing = false;
+
+  $('penToggle').addEventListener('click', () => {
+    penActive = !penActive;
+    $('penToggle').classList.toggle('active', penActive);
+    drawCanvas.classList.toggle('active', penActive);
+  });
+
+  $('penClear').addEventListener('click', () => {
+    drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  });
+
+  document.querySelectorAll('.pen-color').forEach(el => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('.pen-color').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      penColor = el.dataset.color;
+    });
+  });
+
+  function resizeDrawCanvas() {
+    const w = previewContainer.offsetWidth;
+    const h = previewContainer.offsetHeight;
+    if (drawCanvas.width !== w || drawCanvas.height !== h) {
+      const imgData = drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height);
+      drawCanvas.width = w;
+      drawCanvas.height = h;
+      drawCtx.putImageData(imgData, 0, 0);
+    }
+  }
+
+  drawCanvas.addEventListener('mousedown', e => {
+    if (!penActive) return;
+    drawing = true;
+    const rect = drawCanvas.getBoundingClientRect();
+    drawCtx.beginPath();
+    drawCtx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+    drawCtx.strokeStyle = penColor;
+    drawCtx.lineWidth = penSize;
+    drawCtx.lineCap = 'round';
+    drawCtx.lineJoin = 'round';
+  });
+
+  drawCanvas.addEventListener('mousemove', e => {
+    if (!drawing) return;
+    const rect = drawCanvas.getBoundingClientRect();
+    drawCtx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+    drawCtx.stroke();
+  });
+
+  drawCanvas.addEventListener('mouseup', () => { drawing = false; });
+  drawCanvas.addEventListener('mouseleave', () => { drawing = false; });
+
+  // Show pen toolbar during setup & recording
+  function showPenToolbar(show) {
+    $('penToolbar').classList.toggle('show', show);
+    resizeDrawCanvas();
+  }
+
+  // ============ Circular PiP for Webcam ============
+  const pipCamCanvas = $('pipCamCanvas');
+  const pipCamCtx = pipCamCanvas.getContext('2d');
+  const pipCamFeed = $('pipCamFeed');
+  let pipCamFrame = null;
+
+  function renderCircleCam() {
+    const sz = 300;
+    pipCamCtx.clearRect(0, 0, sz, sz);
+    // Black background
+    pipCamCtx.fillStyle = '#000';
+    pipCamCtx.fillRect(0, 0, sz, sz);
+    // Circular clip
+    pipCamCtx.save();
+    pipCamCtx.beginPath();
+    pipCamCtx.arc(sz / 2, sz / 2, sz / 2 - 4, 0, Math.PI * 2);
+    pipCamCtx.clip();
+    // Draw webcam (cover fit + mirror)
+    if (camVideo.videoWidth) {
+      const vw = camVideo.videoWidth, vh = camVideo.videoHeight;
+      const vA = vw / vh;
+      let sx = 0, sy = 0, sw = vw, sh = vh;
+      if (vA > 1) { sw = vh; sx = (vw - sw) / 2; }
+      else { sh = vw; sy = (vh - sh) / 2; }
+      if (S.mirror) {
+        pipCamCtx.translate(sz, 0);
+        pipCamCtx.scale(-1, 1);
+      }
+      pipCamCtx.drawImage(camVideo, sx, sy, sw, sh, 0, 0, sz, sz);
+    }
+    pipCamCtx.restore();
+    // Circle border
+    pipCamCtx.strokeStyle = 'rgba(255,255,255,0.2)';
+    pipCamCtx.lineWidth = 3;
+    pipCamCtx.beginPath();
+    pipCamCtx.arc(sz / 2, sz / 2, sz / 2 - 4, 0, Math.PI * 2);
+    pipCamCtx.stroke();
+    pipCamFrame = requestAnimationFrame(renderCircleCam);
+  }
+
+  // ============ Cursor Effects (trail / ripples / click-zoom) ============
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function computeZoomFactor() {
+    const zs = S.fx.zoomState;
+    if (!zs) return 1;
+    const elapsed = performance.now() - zs.t0;
+    const target = S.fx.zoomLevel;
+    const ZI = FX.ZOOM_IN_MS, ZH = FX.ZOOM_HOLD_MS, ZO = FX.ZOOM_OUT_MS;
+    if (elapsed < ZI) return 1 + (target - 1) * easeOutCubic(elapsed / ZI);
+    if (elapsed < ZI + ZH) return target;
+    if (elapsed < ZI + ZH + ZO) {
+      const t = (elapsed - ZI - ZH) / ZO;
+      return target - (target - 1) * easeOutCubic(t);
+    }
+    S.fx.zoomState = null;
+    return 1;
+  }
+
+  // Map normalized screen coord [0,1] -> current canvas px.
+  // Returns null if the point is outside the (possibly zoomed) source rect.
+  function screenNormToCanvas(nx, ny, cw, ch) {
+    const s = S.fx._src;
+    if (!s || !s.vw) return null;
+    const vx = nx * s.vw, vy = ny * s.vh;
+    const rx = (vx - s.x) / s.w;
+    const ry = (vy - s.y) / s.h;
+    if (rx < -0.02 || rx > 1.02 || ry < -0.02 || ry > 1.02) return null;
+    return [rx * cw, ry * ch];
+  }
+
+  // ===== Spotlight / vignette around the cursor =====
+  function drawSpotlight(cw, ch) {
+    if (!S.spot.enabled) return;
+    const cp = S.fx.cursorPos;
+    if (!cp) return; // 无后台坐标不画
+    // Follow the smoothed fake-cursor position when available, else raw cursor
+    let nx = cp.x, ny = cp.y;
+    if (S.cursorFx.enabled && S.cursorFx.has) { nx = S.cursorFx.x; ny = S.cursorFx.y; }
+    const pt = screenNormToCanvas(nx, ny, cw, ch);
+    if (!pt) return;
+    const px = pt[0], py = pt[1];
+    const R = Math.min(cw, ch) * S.spot.radius;
+    const g = ctx.createRadialGradient(px, py, R * 0.55, px, py, R * 1.5);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,0,' + S.spot.dim + ')');
+    ctx.save();
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.restore();
+  }
+
+  // ===== Synthesised click "tick" — routed into the recording's audio dest =====
+  function playClick() {
+    const ac = S.audioCtx, dest = S.recDest;
+    if (!ac || !dest || !S.recording) return;
+    const t = ac.currentTime;
+    const osc = ac.createOscillator();
+    const g = ac.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(1150, t);
+    osc.frequency.exponentialRampToValueAtTime(520, t + 0.045);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.34, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+    osc.connect(g); g.connect(dest);
+    osc.start(t); osc.stop(t + 0.08);
+  }
+
+  // ===== Custom fake cursor =====
+  const CURSOR_STYLES = ['arrow', 'hand', 'ring', 'dot'];
+  function drawFakeCursor(cw, ch) {
+    const cf = S.cursorFx;
+    if (!cf.enabled) return;
+    const cp = S.fx.cursorPos;
+    if (!cp) return; // 没有后台坐标就不画
+    const now = performance.now();
+    // Smooth the position toward the latest backend cursor (de-jitter)
+    const dt = cf.lastT ? Math.min(100, now - cf.lastT) : 16;
+    cf.lastT = now;
+    if (!cf.has) { cf.x = cp.x; cf.y = cp.y; cf.has = true; }
+    else {
+      const a = 1 - Math.exp(-dt / CURSOR_TAU);
+      cf.x += (cp.x - cf.x) * a;
+      cf.y += (cp.y - cf.y) * a;
+    }
+    // Idle auto-hide: fade out after ~2.6s without cursor movement, fade back on move
+    const targetA = (cf.idleHide && (now - (cp.t || 0)) > 2600) ? 0 : 1;
+    cf.alpha += (targetA - cf.alpha) * (1 - Math.exp(-dt / 180));
+    if (cf.alpha < 0.02) return;
+    const pt = screenNormToCanvas(cf.x, cf.y, cw, ch);
+    if (!pt) return;
+    const px = pt[0], py = pt[1];
+    const base = Math.min(cw, ch) * 0.042; // on-canvas cursor footprint
+    // Click feedback: press-scale + expanding ring
+    const cdt = now - cf.clickT0;
+    const press = (cdt >= 0 && cdt < 220) ? Math.sin((cdt / 220) * Math.PI) : 0;
+    if (cdt >= 0 && cdt < 460) {
+      const t = cdt / 460;
+      const r = base * (0.5 + 2.4 * easeOutCubic(t));
+      ctx.save();
+      ctx.globalAlpha = cf.alpha;
+      ctx.strokeStyle = `rgba(0,180,216,${(1 - t) * 0.6})`;
+      ctx.lineWidth = Math.max(1.5, base * 0.10 * (1 - t));
+      ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.globalAlpha = cf.alpha;
+    ctx.translate(px, py);
+    ctx.scale(1 - 0.18 * press, 1 - 0.18 * press);
+    if (cf.style === 'arrow') drawArrowCursor(base);
+    else if (cf.style === 'hand') drawEmojiCursor('👆', base); // 👆
+    else if (cf.style === 'ring') drawRingCursor(base);
+    else drawDotCursor(base);
+    ctx.restore();
+  }
+  function drawArrowCursor(base) {
+    const k = base / 19;
+    ctx.save();
+    ctx.scale(k, k);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, 16.8);
+    ctx.lineTo(3.6, 13.2);
+    ctx.lineTo(6.0, 18.8);
+    ctx.lineTo(8.1, 17.9);
+    ctx.lineTo(5.7, 12.5);
+    ctx.lineTo(10.2, 12.5);
+    ctx.closePath();
+    ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 2.4; ctx.shadowOffsetY = 1;
+    ctx.fillStyle = '#fff'; ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.lineWidth = 1.4; ctx.strokeStyle = 'rgba(20,22,30,0.92)'; ctx.stroke();
+    ctx.restore();
+  }
+  function drawRingCursor(base) {
+    const r = base * 0.5;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,180,216,0.22)';
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = Math.max(2, base * 0.15);
+    ctx.strokeStyle = 'rgba(0,180,216,0.95)';
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+  function drawDotCursor(base) {
+    const r = base * 0.34;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 3;
+    ctx.fillStyle = 'rgba(255,71,87,0.88)';
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.lineWidth = Math.max(1.5, base * 0.07);
+    ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+  function drawEmojiCursor(glyph, base) {
+    const fs = base * 1.7;
+    ctx.save();
+    ctx.font = fs + 'px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 1;
+    // 👆 fingertip sits near the glyph top — push the glyph down so the tip ≈ point
+    ctx.fillText(glyph, 0, fs * 0.42);
+    ctx.restore();
+  }
+
+  function drawCursorEffects(cw, ch) {
+    const now = performance.now();
+    const hist = S.fx.trailHistory;
+    while (hist.length && now - hist[0].t > FX.TRAIL_FADE_MS) hist.shift();
+
+    // --- Trail: rainbow line ---
+    if (S.fx.trail === 'rainbow' && hist.length >= 2) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      for (let i = 1; i < hist.length; i++) {
+        const a = hist[i - 1], b = hist[i];
+        const age = (now - b.t) / FX.TRAIL_FADE_MS;
+        const alpha = (1 - age) * 0.85;
+        const hue = (now / 8 + i * 8) % 360;
+        const w = (1 - age) * 14 + 4;
+        const ap = screenNormToCanvas(a.x, a.y, cw, ch);
+        const bp = screenNormToCanvas(b.x, b.y, cw, ch);
+        if (!ap || !bp) continue;
+        ctx.strokeStyle = `hsla(${hue},90%,62%,${alpha})`;
+        ctx.lineWidth = w;
+        ctx.beginPath();
+        ctx.moveTo(ap[0], ap[1]);
+        ctx.lineTo(bp[0], bp[1]);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // --- Trail: star particles ---
+    if (S.fx.trail === 'stars') {
+      if (hist.length >= 2) {
+        const last = hist[hist.length - 1];
+        const prev = hist[hist.length - 2];
+        const lp = screenNormToCanvas(last.x, last.y, cw, ch);
+        const pp = screenNormToCanvas(prev.x, prev.y, cw, ch);
+        if (lp && pp) {
+          const dist = Math.hypot(lp[0] - pp[0], lp[1] - pp[1]);
+          const count = Math.min(3, Math.floor(dist / 6));
+          for (let i = 0; i < count; i++) {
+            const ang = Math.random() * Math.PI * 2;
+            const sp = 0.4 + Math.random() * 1.2;
+            S.fx.stars.push({
+              x: lp[0] + (Math.random() - 0.5) * 6,
+              y: lp[1] + (Math.random() - 0.5) * 6,
+              vx: Math.cos(ang) * sp,
+              vy: Math.sin(ang) * sp - 0.3,
+              t0: now,
+              life: FX.STAR_LIFE_MS * (0.7 + Math.random() * 0.6),
+              color: `hsl(${Math.floor(now / 10 + Math.random() * 60) % 360},90%,65%)`,
+              size: 6 + Math.random() * 6,
+            });
+          }
+        }
+      }
+      S.fx.stars = S.fx.stars.filter(p => now - p.t0 < p.life);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const p of S.fx.stars) {
+        const age = (now - p.t0) / p.life;
+        const alpha = (1 - age) * 0.9;
+        const r = p.size * (1 - age * 0.4);
+        p.x += p.vx; p.y += p.vy; p.vy += 0.04;
+        drawStar(ctx, p.x, p.y, r, p.color, alpha);
+      }
+      ctx.restore();
+    }
+
+    // --- Trail: hearts ---
+    if (S.fx.trail === 'hearts' && hist.length >= 2) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < hist.length; i += 2) {
+        const h = hist[i];
+        const age = (now - h.t) / FX.TRAIL_FADE_MS;
+        const alpha = (1 - age) * 0.85;
+        const r = (1 - age) * 14 + 4;
+        const p = screenNormToCanvas(h.x, h.y, cw, ch);
+        if (!p) continue;
+        const hue = (now / 8 + i * 6) % 360;
+        drawHeart(ctx, p[0], p[1], r, `hsl(${hue},85%,62%)`, alpha);
+      }
+      ctx.restore();
+    }
+
+    // --- Click ripples ---
+    S.fx.ripples = S.fx.ripples.filter(r => now - r.t0 < FX.RIPPLE_DUR_MS);
+    if (S.fx.ripples.length) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const r of S.fx.ripples) {
+        const t = (now - r.t0) / FX.RIPPLE_DUR_MS;
+        const eased = easeOutCubic(t);
+        const radius = eased * Math.min(cw, ch) * 0.12;
+        const alpha = (1 - t) * 0.75;
+        const p = screenNormToCanvas(r.x, r.y, cw, ch);
+        if (!p) continue;
+        ctx.strokeStyle = `rgba(255,220,100,${alpha})`;
+        ctx.lineWidth = 4 * (1 - t * 0.4);
+        ctx.beginPath();
+        ctx.arc(p[0], p[1], radius, 0, Math.PI * 2);
+        ctx.stroke();
+        const grad = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], radius);
+        grad.addColorStop(0, `rgba(255,240,150,${alpha * 0.5})`);
+        grad.addColorStop(1, 'rgba(255,240,150,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(p[0], p[1], radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawStar(ctx, cx, cy, r, color, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const ang = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
+      ctx.lineTo(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r);
+      const ang2 = ang + Math.PI / 5;
+      ctx.lineTo(cx + Math.cos(ang2) * r * 0.45, cy + Math.sin(ang2) * r * 0.45);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawHeart(ctx, cx, cy, r, color, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.translate(cx, cy);
+    ctx.scale(r / 16, r / 16);
+    ctx.beginPath();
+    ctx.moveTo(0, 4);
+    ctx.bezierCurveTo(-2, -10, -16, -10, -16, 2);
+    ctx.bezierCurveTo(-16, 10, 0, 16, 0, 16);
+    ctx.bezierCurveTo(0, 16, 16, 10, 16, 2);
+    ctx.bezierCurveTo(16, -10, 2, -10, 0, 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // --- WebSocket to cursor_tracker.py ---
+  const fxStatusEl = $('fxStatus');
+  const fxStatusBox = $('fxStatusBox');
+  function updateFxStatus() {
+    if (!fxStatusEl || !fxStatusBox) return;
+    if (S.fx.wsConnected) {
+      fxStatusEl.textContent = '后台已连接';
+      fxStatusBox.classList.remove('disconnected');
+      fxStatusBox.classList.add('connected');
+      fxStatusBox.title = '鼠标特效后台已连接（cursor_tracker.py 正在运行）';
+    } else {
+      fxStatusEl.textContent = '后台未连接';
+      fxStatusBox.classList.remove('connected');
+      fxStatusBox.classList.add('disconnected');
+      fxStatusBox.title = '鼠标特效后台未连接（请重启 启动录屏工具.bat）';
+    }
+  }
+  let fxReconnectTimer = null;
+  function connectFxWs() {
+    if (S.fx.ws) return;
+    let ws;
+    try { ws = new WebSocket('ws://127.0.0.1:9091'); }
+    catch (e) { scheduleFxReconnect(); return; }
+    S.fx.ws = ws;
+    ws.onopen = () => { S.fx.wsConnected = true; updateFxStatus(); };
+    ws.onclose = () => {
+      S.fx.wsConnected = false; S.fx.ws = null;
+      updateFxStatus(); scheduleFxReconnect();
+    };
+    ws.onerror = () => { try { ws.close(); } catch (e) {} };
+    ws.onmessage = ev => {
+      let m;
+      try { m = JSON.parse(ev.data); } catch (e) { return; }
+      const now = performance.now();
+      if (m.t === 'm') {
+        S.fx.cursorPos = { x: m.x, y: m.y, t: now };
+        const hist = S.fx.trailHistory;
+        hist.push({ x: m.x, y: m.y, t: now });
+        if (hist.length > 240) hist.shift();
+        if (S.az.enabled) { S.az.tx = m.x; S.az.ty = m.y; S.az.lastActivity = now; }
+      } else if (m.t === 'c') {
+        if (S.fx.clickMode === 'ripple') S.fx.ripples.push({ x: m.x, y: m.y, t0: now });
+        else if (S.fx.clickMode === 'zoom') S.fx.zoomState = { x: m.x, y: m.y, t0: now };
+        // 头像点击放大强调(仅人像模式生效,渲染时判断)
+        if (S.camZoomClick) S.fx.camPulseT0 = now;
+        // 点击视为强活动：把焦点拉到点击处并立即续命
+        if (S.az.enabled) { S.az.tx = m.x; S.az.ty = m.y; S.az.lastActivity = now; }
+        // 自定义光标点击反馈动画
+        if (S.cursorFx.enabled) S.cursorFx.clickT0 = now;
+        // 点击咔哒声(录进成片)
+        if (S.clickSound.enabled) playClick();
+      }
+    };
+  }
+  function scheduleFxReconnect() {
+    if (fxReconnectTimer) return;
+    fxReconnectTimer = setTimeout(() => { fxReconnectTimer = null; connectFxWs(); }, 3000);
+  }
+  connectFxWs();
+  updateFxStatus();
+
+  // FX UI bindings — single-select per row
+  document.querySelectorAll('[data-trail]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-trail]').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+      S.fx.trail = btn.dataset.trail;
+      if (S.fx.trail === 'off') S.fx.trailHistory = [];
+      if (S.fx.trail !== 'stars') S.fx.stars = [];
+    });
+  });
+  document.querySelectorAll('[data-click]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-click]').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+      S.fx.clickMode = btn.dataset.click;
+      if (S.fx.clickMode !== 'ripple') S.fx.ripples = [];
+      if (S.fx.clickMode !== 'zoom') S.fx.zoomState = null;
+    });
+  });
+
+  // ============ Teleprompter ============
+  const telePanel = $('telePanel');
+  const teleText = $('teleText');
+  const teleBody = $('teleBody');
+  const teleHeader = $('teleHeader');
+  const TELE_LS_SCRIPTS = 'fuyou.tele.scripts';
+  const TELE_LS_PREFS = 'fuyou.tele.prefs';
+  const teleS = {
+    speed: 40, fontSize: 28, scrollY: 0, playing: true,
+    lastFrame: 0, rafId: null, dragging: false,
+  };
+
+  function teleLoadPrefs() {
+    try {
+      const p = JSON.parse(localStorage.getItem(TELE_LS_PREFS) || '{}');
+      if (typeof p.speed === 'number') teleS.speed = p.speed;
+      if (typeof p.fontSize === 'number') teleS.fontSize = p.fontSize;
+      if (p.pos) {
+        if (typeof p.pos.left === 'number') telePanel.style.left = p.pos.left + 'px';
+        if (typeof p.pos.top === 'number') telePanel.style.top = p.pos.top + 'px';
+        if (typeof p.pos.right === 'number' && typeof p.pos.left !== 'number') telePanel.style.right = p.pos.right + 'px';
+        if (typeof p.pos.width === 'number') telePanel.style.width = p.pos.width + 'px';
+        if (typeof p.pos.height === 'number') telePanel.style.height = p.pos.height + 'px';
+      }
+    } catch (e) {}
+  }
+  function teleSavePrefs() {
+    const r = telePanel.getBoundingClientRect();
+    localStorage.setItem(TELE_LS_PREFS, JSON.stringify({
+      speed: teleS.speed, fontSize: teleS.fontSize,
+      pos: { left: r.left, top: r.top, width: r.width, height: r.height },
+    }));
+  }
+  function teleLoadScripts() {
+    try { return JSON.parse(localStorage.getItem(TELE_LS_SCRIPTS) || '[]'); }
+    catch (e) { return []; }
+  }
+  function teleSaveScript(text) {
+    const list = teleLoadScripts();
+    const idx = list.indexOf(text);
+    if (idx >= 0) list.splice(idx, 1);
+    list.unshift(text);
+    while (list.length > 5) list.pop();
+    localStorage.setItem(TELE_LS_SCRIPTS, JSON.stringify(list));
+    refreshScriptHistory();
+  }
+  function refreshScriptHistory() {
+    const sel = $('scriptHistory');
+    const list = teleLoadScripts();
+    while (sel.options.length > 1) sel.remove(1);
+    list.forEach((s, i) => {
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      const preview = s.replace(/\s+/g, ' ').trim().substring(0, 40);
+      opt.textContent = preview + (s.length > 40 ? '…' : '');
+      sel.appendChild(opt);
+    });
+  }
+  $('scriptHistory').addEventListener('change', e => {
+    const i = parseInt(e.target.value);
+    if (Number.isNaN(i)) return;
+    const list = teleLoadScripts();
+    if (list[i] != null) $('scriptText').value = list[i];
+    e.target.value = '';
+  });
+
+  function updateTeleLabels() {
+    $('teleSpeedLabel').textContent = teleS.speed + ' px/s';
+    $('teleFontSizeLabel').textContent = teleS.fontSize + 'px';
+    $('telePlayPause').textContent = teleS.playing ? '⏸' : '▶';
+  }
+  function teleLoop(ts) {
+    if (!teleS.lastFrame) teleS.lastFrame = ts;
+    const dt = (ts - teleS.lastFrame) / 1000;
+    teleS.lastFrame = ts;
+    if (teleS.playing && !teleS.dragging) {
+      teleS.scrollY += teleS.speed * dt;
+      teleBody.scrollTop = teleS.scrollY;
+      const max = teleText.scrollHeight - teleBody.clientHeight;
+      if (teleS.scrollY >= max) {
+        teleS.scrollY = max;
+        teleS.playing = false;
+        updateTeleLabels();
+      }
+    } else {
+      teleS.scrollY = teleBody.scrollTop;
+    }
+    teleS.rafId = requestAnimationFrame(teleLoop);
+  }
+  function openTele() {
+    const text = $('scriptText').value.trim();
+    if (!text) { showError('请先在文本框中粘贴或输入讲稿'); return; }
+    teleSaveScript(text);
+    teleText.textContent = text;
+    teleText.style.fontSize = teleS.fontSize + 'px';
+    telePanel.style.display = '';
+    teleS.scrollY = 0;
+    teleBody.scrollTop = 0;
+    teleS.playing = true;
+    teleS.lastFrame = 0;
+    cancelAnimationFrame(teleS.rafId);
+    teleS.rafId = requestAnimationFrame(teleLoop);
+    updateTeleLabels();
+  }
+  function closeTele() {
+    telePanel.style.display = 'none';
+    cancelAnimationFrame(teleS.rafId);
+    teleS.rafId = null;
+    teleSavePrefs();
+  }
+
+  $('openTeleBtn').addEventListener('click', openTele);
+  $('teleClose').addEventListener('click', closeTele);
+  $('teleSlower').addEventListener('click', () => {
+    teleS.speed = Math.max(10, teleS.speed - 10);
+    updateTeleLabels(); teleSavePrefs();
+  });
+  $('teleFaster').addEventListener('click', () => {
+    teleS.speed = Math.min(150, teleS.speed + 10);
+    updateTeleLabels(); teleSavePrefs();
+  });
+  $('teleSmaller').addEventListener('click', () => {
+    teleS.fontSize = Math.max(14, teleS.fontSize - 2);
+    teleText.style.fontSize = teleS.fontSize + 'px';
+    updateTeleLabels(); teleSavePrefs();
+  });
+  $('teleBigger').addEventListener('click', () => {
+    teleS.fontSize = Math.min(56, teleS.fontSize + 2);
+    teleText.style.fontSize = teleS.fontSize + 'px';
+    updateTeleLabels(); teleSavePrefs();
+  });
+  $('teleRewind').addEventListener('click', () => {
+    teleS.scrollY = 0;
+    teleBody.scrollTop = 0;
+    teleS.playing = true;
+    updateTeleLabels();
+  });
+  $('telePlayPause').addEventListener('click', () => {
+    teleS.playing = !teleS.playing;
+    updateTeleLabels();
+  });
+
+  // Drag teleprompter panel
+  let teleDrag = { startX: 0, startY: 0, panelX: 0, panelY: 0 };
+  teleHeader.addEventListener('mousedown', e => {
+    if (e.target.closest('.tele-btn')) return;
+    teleS.dragging = true;
+    teleDrag.startX = e.clientX;
+    teleDrag.startY = e.clientY;
+    const r = telePanel.getBoundingClientRect();
+    teleDrag.panelX = r.left;
+    teleDrag.panelY = r.top;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!teleS.dragging) return;
+    telePanel.style.left = (teleDrag.panelX + e.clientX - teleDrag.startX) + 'px';
+    telePanel.style.top = Math.max(0, teleDrag.panelY + e.clientY - teleDrag.startY) + 'px';
+    telePanel.style.right = '';
+  });
+  document.addEventListener('mouseup', () => {
+    if (!teleS.dragging) return;
+    teleS.dragging = false;
+    teleSavePrefs();
+  });
+
+  // ESC closes teleprompter (capture phase, before stopRecording handler)
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Escape' && telePanel.style.display !== 'none') {
+      e.stopImmediatePropagation();
+      closeTele();
+    }
+  }, true);
+
+  // Init
+  teleLoadPrefs();
+  refreshScriptHistory();
+  updateTeleLabels();
+
+  // ============ Keyboard Shortcuts ============
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.code === 'Space') { e.preventDefault(); if (S.recording) togglePause(); else $('startBtn').click(); }
+    if (e.code === 'Escape' && S.recording) stopRecording();
+    if (e.code === 'KeyC' && !S.recording) {
+      camPip.style.display = camPip.style.display === 'none' ? '' : 'none';
+    }
+    if (e.code === 'KeyS' && !e.ctrlKey && !e.metaKey) {
+      const next = S.camShape === 'circle' ? 'square' : 'circle';
+      const btn = document.querySelector(`[data-shape="${next}"]`);
+      if (btn) btn.click();
+    }
+    if (e.code === 'KeyM') $('micBtn').click();
+  });
+
+  // ============ Window Resize ============
+  window.addEventListener('resize', () => { if (cropOverlay.classList.contains('active')) initCrop(); });
+
+})();
+</script>
+</body>
+</html>

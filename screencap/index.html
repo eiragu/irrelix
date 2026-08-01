@@ -46,19 +46,6 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
 #previewCanvas{max-width:100%;max-height:520px;border-radius:4px}
 .ratio-indicator{position:absolute;top:0;left:50%;transform:translateX(-50%);border:2px dashed rgba(108,92,231,0.4);border-radius:8px;pointer-events:none;transition:all .35s ease;z-index:3}
 
-/* Crop overlay */
-.crop-overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;display:none}
-.crop-overlay.active{display:block;pointer-events:auto}
-.crop-mask{position:absolute;top:0;left:0;width:100%;height:100%}
-.crop-box{position:absolute;border:2px solid var(--accent2);cursor:move;z-index:10}
-.crop-box::after{content:'';position:absolute;inset:0;border:1px dashed rgba(255,255,255,0.3)}
-.crop-handle{position:absolute;width:12px;height:12px;background:var(--accent2);border-radius:50%;z-index:11;transform:translate(-50%,-50%)}
-.crop-handle.tl{top:0;left:0;cursor:nw-resize}
-.crop-handle.tr{top:0;left:100%;cursor:ne-resize}
-.crop-handle.bl{top:100%;left:0;cursor:sw-resize}
-.crop-handle.br{top:100%;left:100%;cursor:se-resize}
-.crop-size-label{position:absolute;bottom:-28px;right:0;font-size:11px;color:var(--accent2);background:rgba(0,0,0,0.7);padding:2px 8px;border-radius:4px;white-space:nowrap}
-
 /* Webcam pip */
 .cam-pip{position:absolute;bottom:20px;left:20px;width:80px;height:80px;z-index:20;cursor:grab;overflow:hidden;border:none;transition:border-radius .3s,width .3s,height .3s,box-shadow .2s;box-shadow:0 8px 24px rgba(0,0,0,0.18),0 2px 6px rgba(0,0,0,0.10)}
 .cam-pip.circle{border-radius:50%}
@@ -155,6 +142,9 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
 /* State B: confirmBtn — solid red "● 开始录制" */
 .rec-btn.confirm-rec{background:var(--red);color:#fff;box-shadow:0 4px 16px rgba(255,71,87,0.35)}
 .rec-btn.confirm-rec:hover{background:#ff6b7a;transform:scale(1.03);box-shadow:0 6px 20px rgba(255,71,87,0.5)}
+/* State B: cancelBtn — quiet neutral, exits back to idle */
+.rec-btn.cancel-setup{background:var(--card2);border:1px solid var(--border);color:var(--text2);padding:10px 22px;font-size:14px}
+.rec-btn.cancel-setup:hover{border-color:var(--accent1);color:var(--text)}
 /* State C: solid red, dot pulses, embedded timer */
 .rec-btn.recording{background:var(--red);color:#fff;box-shadow:0 4px 16px rgba(255,71,87,0.35);cursor:default}
 .rec-btn.recording:hover{transform:none}
@@ -216,12 +206,6 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
 .mic-level{width:60px;height:4px;border-radius:2px;background:var(--card2);overflow:hidden;margin-left:4px}
 .mic-level-bar{height:100%;width:0%;background:var(--green);border-radius:2px;transition:width 0.1s}
 
-/* Screen Studio cinematic background */
-.bg-swatches{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
-.bg-sw{width:24px;height:24px;border-radius:7px;cursor:pointer;border:2px solid transparent;transition:transform .15s,box-shadow .15s;flex-shrink:0}
-.bg-sw:hover{transform:scale(1.12)}
-.bg-sw.active{border-color:#fff;box-shadow:0 0 10px rgba(255,255,255,0.35)}
-
 /* Drawing overlay */
 .draw-overlay{position:absolute;inset:0;z-index:25;cursor:crosshair;display:none}
 .draw-overlay.active{display:block}
@@ -263,7 +247,7 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
 </style>
 <style id="web-build-hide-fx">
 /* 线上版：隐藏依赖本地 cursor_tracker.py 的鼠标特效功能 */
-#fxStatusBox,#azRow,#fxTrailRow,#fxClickRow,#cursorRow,#cursorPlusRow{display:none!important}
+#fxStatusBox,#azRow,#fxTrailRow,#fxClickRow{display:none!important}
 </style>
 </head>
 <body>
@@ -334,21 +318,6 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
       <div class="placeholder" id="placeholder">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16"/></svg>
         <p id="placeholderText">① 选择录制模式 → ② 选择屏幕源 → ③ 开始录制</p>
-      </div>
-
-      <!-- Crop overlay -->
-      <div class="crop-overlay" id="cropOverlay">
-        <svg class="crop-mask" id="cropMask">
-          <defs><mask id="cropMaskDef"><rect width="100%" height="100%" fill="white"/><rect id="cropMaskHole" fill="black"/></mask></defs>
-          <rect width="100%" height="100%" fill="rgba(0,0,0,0.55)" mask="url(#cropMaskDef)"/>
-        </svg>
-        <div class="crop-box" id="cropBox">
-          <div class="crop-handle tl" data-dir="tl"></div>
-          <div class="crop-handle tr" data-dir="tr"></div>
-          <div class="crop-handle bl" data-dir="bl"></div>
-          <div class="crop-handle br" data-dir="br"></div>
-          <div class="crop-size-label" id="cropSizeLabel">1920 × 1080</div>
-        </div>
       </div>
 
       <!-- Webcam PiP -->
@@ -506,21 +475,6 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
       </div>
     </div>
 
-    <div class="control-row" id="bgRow">
-      <span class="control-label">电影背景</span>
-      <div class="toggle-group">
-        <button class="toggle-btn on" data-bgframe="off">关闭</button>
-        <button class="toggle-btn" data-bgframe="on">开启</button>
-      </div>
-      <div class="bg-swatches" id="bgSwatches"></div>
-      <div class="sub-group" style="margin-left:auto">
-        <span class="sub-label">留白</span>
-        <button class="toggle-btn" data-bgpad="s">小</button>
-        <button class="toggle-btn on" data-bgpad="m">中</button>
-        <button class="toggle-btn" data-bgpad="l">大</button>
-      </div>
-    </div>
-
     <div class="control-row" id="azRow">
       <span class="control-label">智能变焦</span>
       <div class="toggle-group">
@@ -554,28 +508,6 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
       </div>
     </div>
 
-    <div class="control-row" id="cursorRow">
-      <span class="control-label">自定义光标</span>
-      <div class="toggle-group">
-        <button class="toggle-btn on" data-cursor="off">关闭</button>
-        <button class="toggle-btn" data-cursor="arrow">箭头</button>
-        <button class="toggle-btn" data-cursor="hand">手 👆</button>
-        <button class="toggle-btn" data-cursor="ring">圆环</button>
-        <button class="toggle-btn" data-cursor="dot">圆点</button>
-      </div>
-      <span style="font-size:11px;color:var(--text2);margin-left:6px">替换系统光标，点击有反馈 · 选屏前先选 · 需后台 cursor_tracker.py</span>
-    </div>
-
-    <div class="control-row" id="cursorPlusRow">
-      <span class="control-label">光标增强</span>
-      <div class="toggle-group">
-        <button class="toggle-btn" data-enh="spot"><div class="dot"></div><span>聚光灯</span></button>
-        <button class="toggle-btn" data-enh="sound"><div class="dot"></div><span>点击咔哒声</span></button>
-        <button class="toggle-btn" data-enh="idle"><div class="dot"></div><span>闲置隐藏光标</span></button>
-      </div>
-      <span style="font-size:11px;color:var(--text2);margin-left:6px">各自独立开关，要哪个点哪个 · 需后台 cursor_tracker.py</span>
-    </div>
-
     <div class="control-row" id="teleRow">
       <span class="control-label">提词器</span>
       <div class="tele-input-wrap">
@@ -596,11 +528,12 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
         <div class="rec-dot"></div>
         开始录制
       </button>
+      <button class="rec-btn cancel-setup" id="cancelBtn" style="display:none">取消</button>
       <button class="rec-btn pause" id="pauseBtn" disabled>暂停</button>
       <button class="rec-btn stop" id="stopBtn" disabled>停止</button>
       <div class="timer" id="timer">00:00:00</div>
     </div>
-    <p id="setupHint" style="display:none;text-align:center;font-size:12px;color:var(--text2);margin-top:8px">拖动裁切框选择录制区域，拖动摄像头圈调整位置，满意后点击「开始录制」</p>
+    <p id="setupHint" style="display:none;text-align:center;font-size:12px;color:var(--text2);margin-top:8px">画面会完整缩放进所选比例（不裁切），拖动摄像头圈调整位置，满意后点击「开始录制」</p>
   </div>
 
   <!-- Done Page -->
@@ -630,6 +563,7 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
 <div class="float-bar" id="floatBar">
   <div class="float-dot"></div>
   <div class="timer" id="floatTimer">00:00:00</div>
+  <button class="float-btn" id="floatCamBtn" style="display:none">隐藏头像</button>
   <button class="float-btn" id="floatPauseBtn">暂停</button>
   <button class="float-btn stop-btn" id="floatStopBtn">停止</button>
 </div>
@@ -724,15 +658,6 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     animFrame: null,
     blob: null,
     camReady: false,
-    cropRect: { x: 0, y: 0, w: 0, h: 0 },
-    // ===== Screen Studio 风格：电影感效果 =====
-    bg: {
-      enabled: false,
-      preset: 'aurora',   // 见 BG_PRESETS
-      padding: 0.055,     // 留白占短边比例
-      radius: 0.028,      // 圆角占短边比例
-      shadow: true,
-    },
     az: {                 // 智能自动变焦
       enabled: false,
       level: 1,           // 当前已缓动的缩放
@@ -741,24 +666,6 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
       max: 1.8,           // 推近倍数
       lastActivity: -1e9,
       lastT: 0,
-    },
-    cursorFx: {           // 自定义假光标(平滑跟随 + 可选样式 + 点击反馈)
-      enabled: false,
-      style: 'arrow',     // 'arrow' | 'hand' | 'ring' | 'dot'
-      x: 0.5, y: 0.5,     // 已缓动的归一化坐标
-      has: false,
-      lastT: 0,
-      clickT0: -1e9,      // 最近一次点击时间(performance.now) 用于按下/圆环动画
-      idleHide: false,    // 闲置自动隐藏假光标
-      alpha: 1,           // 当前淡入淡出透明度
-    },
-    spot: {               // 聚光灯/暗角:光标周围亮,四周压暗
-      enabled: false,
-      radius: 0.22,       // 亮区半径占短边比例
-      dim: 0.55,          // 四周压暗强度 0~1
-    },
-    clickSound: {         // 点击咔哒声(合成,直接录进成片)
-      enabled: false,
     },
     fx: {
       trail: 'off',         // 默认关闭(需要再手动开); 'rainbow' | 'stars' | 'hearts' | 'off'
@@ -771,7 +678,8 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
       zoomState: null,      // {x, y, t0}
       ws: null,
       wsConnected: false,
-      _src: null,           // last drawImage source rect (canvas-px / video-px)
+      _src: null,           // last drawImage source rect (video-px)
+      _dst: null,           // last drawImage dest rect (canvas-px, contain-fit letterbox)
       camPulseT0: -1e9,     // 头像点击放大动画的起始时间(performance.now)
     },
   };
@@ -793,23 +701,6 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     OUT_TAU: 420,    // 拉远缓动时间常数(ms)
     FOCUS_TAU: 240,  // 焦点跟随缓动时间常数(ms)
   };
-  const CURSOR_TAU = 95; // 假光标插值平滑时间常数(ms)
-
-  // 背景预设：每个是一个 (ctx,w,h)=>fillStyle 的函数
-  const BG_PRESETS = {
-    aurora:   (c,w,h) => { const g=c.createLinearGradient(0,0,w,h); g.addColorStop(0,'#6C5CE7'); g.addColorStop(1,'#00B4D8'); return g; },
-    sunset:   (c,w,h) => { const g=c.createLinearGradient(0,0,w,h); g.addColorStop(0,'#FF6B6B'); g.addColorStop(1,'#FFB36B'); return g; },
-    ocean:    (c,w,h) => { const g=c.createLinearGradient(0,0,w,h); g.addColorStop(0,'#2193b0'); g.addColorStop(1,'#6dd5ed'); return g; },
-    grape:    (c,w,h) => { const g=c.createLinearGradient(0,0,w,h); g.addColorStop(0,'#5f2c82'); g.addColorStop(1,'#c471ed'); return g; },
-    graphite: (c,w,h) => { const g=c.createLinearGradient(0,0,w,h); g.addColorStop(0,'#2c3140'); g.addColorStop(1,'#0f1419'); return g; },
-    snow:     (c,w,h) => '#f1f1f4',
-  };
-  const BG_SWATCHES = {
-    aurora:'linear-gradient(135deg,#6C5CE7,#00B4D8)', sunset:'linear-gradient(135deg,#FF6B6B,#FFB36B)',
-    ocean:'linear-gradient(135deg,#2193b0,#6dd5ed)', grape:'linear-gradient(135deg,#5f2c82,#c471ed)',
-    graphite:'linear-gradient(135deg,#2c3140,#0f1419)', snow:'#f1f1f4',
-  };
-
   // Cam sizes as % of container's shorter side — adapts to all ratios
   const camSizePercent = { s: 0.18, m: 0.25, l: 0.35 };
 
@@ -833,10 +724,6 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
   const ctx = canvas.getContext('2d');
   const placeholder = $('placeholder');
   const previewContainer = $('previewContainer');
-  const cropOverlay = $('cropOverlay');
-  const cropBox = $('cropBox');
-  const cropMaskHole = $('cropMaskHole');
-  const cropSizeLabel = $('cropSizeLabel');
   const camPip = $('camPip');
   const camPipVideo = $('camPipVideo');
   const camPreviewFull = $('camPreviewFull');
@@ -997,10 +884,7 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
       $('beautyRow').style.display = S.mode === 'screen' ? 'none' : '';
       $('camBgRow').style.display = S.mode === 'cam' ? '' : 'none';
       $('camClickZoomRow').style.display = S.mode === 'cam' ? '' : 'none';
-      $('bgRow').style.display = noScreen ? 'none' : '';
       $('azRow').style.display = noScreen ? 'none' : '';
-      $('cursorRow').style.display = noScreen ? 'none' : '';
-      $('cursorPlusRow').style.display = noScreen ? 'none' : '';
       const sb = $('startBtn');
       if (!S.recording && (S.uiState === 'A' || !S.uiState)) {
         sb.innerHTML = '<div class="rec-dot"></div>' + (noScreen ? '开始录制' : '选择屏幕');
@@ -1030,7 +914,8 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     const [rw, rh] = S.ratio;
     const aspect = rw / rh;
     const containerW = previewContainer.parentElement.offsetWidth;
-    // Max height 520, min 280
+    // Container is sized to EXACTLY the chosen ratio (WYSIWYG: the container
+    // IS the output frame — the source video letterboxes inside it, uncropped).
     const maxH = 520, minH = 280;
     let h, w;
 
@@ -1039,30 +924,25 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
       w = containerW;
       h = Math.round(w / aspect);
       h = Math.max(minH, Math.min(maxH, h));
+      w = Math.min(containerW, Math.round(h * aspect));
+      h = Math.round(w / aspect);
     } else {
       // Portrait (9:16, 3:4 etc)
       h = maxH;
       w = Math.round(h * aspect);
       w = Math.min(containerW, w);
+      h = Math.round(w / aspect);
     }
 
     previewContainer.style.height = h + 'px';
     previewContainer.style.minHeight = h + 'px';
+    previewContainer.style.width = w + 'px';
+    previewContainer.style.margin = '0 auto';
 
-    // Show ratio indicator frame
-    const cw = previewContainer.offsetWidth;
-    const ch = h;
-    let iw, ih;
-    if (cw / ch > aspect) {
-      ih = ch * 0.92;
-      iw = ih * aspect;
-    } else {
-      iw = cw * 0.92;
-      ih = iw / aspect;
-    }
-    ratioIndicator.style.width = iw + 'px';
-    ratioIndicator.style.height = ih + 'px';
-    ratioIndicator.style.top = ((ch - ih) / 2) + 'px';
+    // Ratio indicator frame hugs the whole container (it IS the frame now)
+    ratioIndicator.style.width = (w - 4) + 'px';
+    ratioIndicator.style.height = (h - 4) + 'px';
+    ratioIndicator.style.top = '2px';
     ratioIndicator.style.left = '50%';
     ratioIndicator.style.transform = 'translateX(-50%)';
     ratioIndicator.style.display = '';
@@ -1105,7 +985,6 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
         $('customRatioInput').classList.remove('show');
         S.ratio = r.split(':').map(Number);
         updatePreviewShape();
-        updateCropToRatio();
         updateRatioPreview();
       }
     });
@@ -1116,7 +995,6 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     const h = parseInt($('customH').value) || 9;
     S.ratio = [w, h];
     updatePreviewShape();
-    updateCropToRatio();
     updateRatioPreview();
   });
   updateRatioPreview();
@@ -1186,45 +1064,6 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     });
   });
 
-  // ============ Screen Studio Cinematic Background ============
-  // Screen Studio 风格电影背景：录屏内容缩进 + 渐变背景 + 圆角 + 柔和投影。
-  // 纯 canvas 后期合成，不依赖任何后台。仅作用于屏幕类模式(screen / screen_cam)。
-  const BG_PAD = { s: 0.035, m: 0.055, l: 0.09 };
-  (function initBgSwatches() {
-    const wrap = $('bgSwatches');
-    Object.keys(BG_SWATCHES).forEach(key => {
-      const sw = document.createElement('div');
-      sw.className = 'bg-sw' + (key === S.bg.preset ? ' active' : '');
-      sw.style.background = BG_SWATCHES[key];
-      sw.dataset.bgpreset = key;
-      sw.title = key;
-      sw.addEventListener('click', () => {
-        if (S.recording) return;
-        document.querySelectorAll('.bg-sw').forEach(s => s.classList.remove('active'));
-        sw.classList.add('active');
-        S.bg.preset = key;
-        if (!S.bg.enabled) setBgEnabled(true); // 选背景即开启效果
-      });
-      wrap.appendChild(sw);
-    });
-  })();
-  function setBgEnabled(on) {
-    S.bg.enabled = on;
-    document.querySelectorAll('[data-bgframe]').forEach(b =>
-      b.classList.toggle('on', b.dataset.bgframe === (on ? 'on' : 'off')));
-  }
-  document.querySelectorAll('[data-bgframe]').forEach(btn => {
-    btn.addEventListener('click', () => { if (!S.recording) setBgEnabled(btn.dataset.bgframe === 'on'); });
-  });
-  document.querySelectorAll('[data-bgpad]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (S.recording) return;
-      document.querySelectorAll('[data-bgpad]').forEach(b => b.classList.remove('on'));
-      btn.classList.add('on');
-      S.bg.padding = BG_PAD[btn.dataset.bgpad] || 0.055;
-    });
-  });
-
   // ============ Screen Studio Smart Auto-Zoom ============
   document.querySelectorAll('[data-az]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1242,40 +1081,6 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
       document.querySelectorAll('[data-azmax]').forEach(b => b.classList.remove('on'));
       btn.classList.add('on');
       S.az.max = parseFloat(btn.dataset.azmax) || 1.8;
-    });
-  });
-
-  // ============ Custom Fake Cursor (selectable style) ============
-  document.querySelectorAll('[data-cursor]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('[data-cursor]').forEach(b => b.classList.remove('on'));
-      btn.classList.add('on');
-      const v = btn.dataset.cursor;
-      if (v === 'off') {
-        S.cursorFx.enabled = false;
-      } else {
-        S.cursorFx.enabled = true;
-        S.cursorFx.style = v;
-        S.cursorFx.has = false; // 重新吸附到当前坐标，避免从旧位置滑入
-      }
-      if (S.cursorFx.enabled && !S.fx.wsConnected) {
-        showError('自定义光标需要鼠标后台 cursor_tracker.py（右上角显示「后台未连接」）。');
-      }
-    });
-  });
-
-  // ============ Cursor Enhancements (spotlight / click sound / idle-hide) ============
-  document.querySelectorAll('[data-enh]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const k = btn.dataset.enh;
-      let on;
-      if (k === 'spot') on = (S.spot.enabled = !S.spot.enabled);
-      else if (k === 'sound') on = (S.clickSound.enabled = !S.clickSound.enabled);
-      else on = (S.cursorFx.idleHide = !S.cursorFx.idleHide);
-      btn.classList.toggle('on', on);
-      if (on && !S.fx.wsConnected) {
-        showError('该效果需要鼠标后台 cursor_tracker.py（右上角显示「后台未连接」）。');
-      }
     });
   });
 
@@ -1329,101 +1134,18 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     camPip.classList.remove('dragging');
   });
 
-  // ============ Crop Box ============
-  let cropDrag = { active: false, type: '', startX: 0, startY: 0, origRect: null };
-
-  function initCrop() {
-    const cw = previewContainer.offsetWidth;
-    const ch = previewContainer.offsetHeight;
-    const [rw, rh] = S.ratio;
-    const aspect = rw / rh;
-    let bw, bh;
-    if (cw / ch > aspect) {
-      bh = ch * 0.85;
-      bw = bh * aspect;
-    } else {
-      bw = cw * 0.85;
-      bh = bw / aspect;
-    }
-    S.cropRect = { x: (cw - bw) / 2, y: (ch - bh) / 2, w: bw, h: bh };
-    applyCrop();
-    cropOverlay.classList.add('active');
-  }
-
-  function updateCropToRatio() {
-    if (!cropOverlay.classList.contains('active') && !S.screenStream) return;
-    if (S.screenStream) initCrop();
-  }
-
-  function applyCrop() {
-    const r = S.cropRect;
-    cropBox.style.left = r.x + 'px';
-    cropBox.style.top = r.y + 'px';
-    cropBox.style.width = r.w + 'px';
-    cropBox.style.height = r.h + 'px';
-    cropMaskHole.setAttribute('x', r.x);
-    cropMaskHole.setAttribute('y', r.y);
-    cropMaskHole.setAttribute('width', r.w);
-    cropMaskHole.setAttribute('height', r.h);
-    if (screenVideo.videoWidth) {
-      const scaleX = screenVideo.videoWidth / previewContainer.offsetWidth;
-      const scaleY = screenVideo.videoHeight / previewContainer.offsetHeight;
-      cropSizeLabel.textContent = `${Math.round(r.w * scaleX)} × ${Math.round(r.h * scaleY)}`;
-    } else {
-      cropSizeLabel.textContent = `${Math.round(r.w)} × ${Math.round(r.h)}`;
-    }
-  }
-
-  cropBox.addEventListener('mousedown', e => {
-    if (e.target.classList.contains('crop-handle')) {
-      cropDrag = { active: true, type: e.target.dataset.dir, startX: e.clientX, startY: e.clientY, origRect: { ...S.cropRect } };
-    } else {
-      cropDrag = { active: true, type: 'move', startX: e.clientX, startY: e.clientY, origRect: { ...S.cropRect } };
-    }
-    e.preventDefault();
-    e.stopPropagation();
-  });
-
-  document.addEventListener('mousemove', e => {
-    if (!cropDrag.active) return;
-    const dx = e.clientX - cropDrag.startX;
-    const dy = e.clientY - cropDrag.startY;
-    const o = cropDrag.origRect;
-    const cw = previewContainer.offsetWidth;
-    const ch = previewContainer.offsetHeight;
-    const aspect = S.ratio[0] / S.ratio[1];
-
-    if (cropDrag.type === 'move') {
-      S.cropRect.x = Math.max(0, Math.min(cw - o.w, o.x + dx));
-      S.cropRect.y = Math.max(0, Math.min(ch - o.h, o.y + dy));
-    } else {
-      let nw, nh, nx, ny;
-      if (cropDrag.type === 'br') { nw = Math.max(60, o.w + dx); nh = nw / aspect; nx = o.x; ny = o.y; }
-      else if (cropDrag.type === 'bl') { nw = Math.max(60, o.w - dx); nh = nw / aspect; nx = o.x + o.w - nw; ny = o.y; }
-      else if (cropDrag.type === 'tr') { nw = Math.max(60, o.w + dx); nh = nw / aspect; nx = o.x; ny = o.y + o.h - nh; }
-      else if (cropDrag.type === 'tl') { nw = Math.max(60, o.w - dx); nh = nw / aspect; nx = o.x + o.w - nw; ny = o.y + o.h - nh; }
-      if (nx < 0) { nw += nx; nh = nw / aspect; nx = 0; }
-      if (ny < 0) { nh += ny; nw = nh * aspect; ny = 0; }
-      if (nx + nw > cw) { nw = cw - nx; nh = nw / aspect; }
-      if (ny + nh > ch) { nh = ch - ny; nw = nh * aspect; }
-      S.cropRect = { x: nx, y: ny, w: nw, h: nh };
-    }
-    applyCrop();
-  });
-
-  document.addEventListener('mouseup', () => { cropDrag.active = false; });
-  cropBox.addEventListener('dblclick', () => { initCrop(); });
-
   // ============ Start / Stop / Pause ============
   $('startBtn').addEventListener('click', () => {
     if (S.uiState === 'D') togglePause();
     else enterSetupPhase();
   });
   $('confirmBtn').addEventListener('click', confirmAndRecord);
+  $('cancelBtn').addEventListener('click', exitSetupPhase);
   $('pauseBtn').addEventListener('click', togglePause);
   $('stopBtn').addEventListener('click', stopRecording);
   $('floatPauseBtn').addEventListener('click', togglePause);
   $('floatStopBtn').addEventListener('click', stopRecording);
+  $('floatCamBtn').addEventListener('click', toggleCamHidden);
   $('recBarPause').addEventListener('click', togglePause);
   $('recBarStop').addEventListener('click', stopRecording);
   $('downloadBtn').addEventListener('click', downloadVideo);
@@ -1446,9 +1168,7 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
       }
       try {
         S.screenStream = await navigator.mediaDevices.getDisplayMedia({
-          // 开了自定义光标就请求隐藏系统光标，避免与画上去的假光标重影
-          // (能否隐藏取决于浏览器/采集对象，全屏采集部分平台可能仍显示)
-          video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 }, cursor: S.cursorFx.enabled ? 'never' : 'always' },
+          video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 }, cursor: 'always' },
           audio: S.sysAudio
         });
       } catch (e) {
@@ -1469,13 +1189,11 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
       camPreviewFull.style.display = 'none';
       ratioIndicator.style.display = 'none';
       await new Promise(r => setTimeout(r, 300));
-      initCrop();
       if (S.mode === 'screen_cam' && S.camReady) {
         camPip.style.display = '';
         camPip.style.zIndex = '20';
       }
       setUiState('B');
-      showPenToolbar(true);
     } catch (err) {
       showError('准备失败: ' + err.message);
       resetBtnState();
@@ -1486,8 +1204,8 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     screenVideo.classList.remove('previewing');
     screenVideo.srcObject = null;
     if (S.screenStream) { S.screenStream.getTracks().forEach(t => t.stop()); S.screenStream = null; }
-    cropOverlay.classList.remove('active');
     $('confirmBtn').style.display = 'none';
+    $('cancelBtn').style.display = 'none';
     $('setupHint').style.display = 'none';
     placeholder.style.display = '';
     ratioIndicator.style.display = '';
@@ -1511,6 +1229,7 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
       catch (e) { S.micStream = null; }
     }
     $('confirmBtn').style.display = 'none';
+    $('cancelBtn').style.display = 'none';
     $('setupHint').style.display = 'none';
     if (S.mode !== 'cam') screenVideo.classList.remove('previewing');
     placeholder.style.display = 'none';
@@ -1527,22 +1246,23 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     }
     setupCanvas();
     await doCountdown();
-    cropOverlay.classList.remove('active');
     ratioIndicator.style.display = 'none';
     cancelAnimationFrame(S.animFrame); // stop any preview loop before the record loop
     renderLoop();
+    startBgTick();
+    S.camHidden = false;
+    $('floatCamBtn').textContent = '隐藏头像';
+    $('floatCamBtn').style.display = ((S.mode === 'screen_cam' || S.mode === 'board') && S.camReady) ? '' : 'none';
 
     const canvasStream = canvas.captureStream(30);
     const audioCtx = new AudioContext();
     const dest = audioCtx.createMediaStreamDestination();
-    S.audioCtx = audioCtx; S.recDest = dest; // 供点击音效注入
     let hasAudio = false;
     if (S.sysAudio && S.screenStream) {
       const sysTracks = S.screenStream.getAudioTracks();
       if (sysTracks.length > 0) { audioCtx.createMediaStreamSource(new MediaStream(sysTracks)).connect(dest); hasAudio = true; }
     }
     if (S.mic && S.micStream) { audioCtx.createMediaStreamSource(S.micStream).connect(dest); hasAudio = true; }
-    if (S.clickSound.enabled) hasAudio = true; // 即使无麦/系统声,也要保留音轨给咔哒声
     const tracks = [...canvasStream.getVideoTracks()];
     if (hasAudio) tracks.push(...dest.stream.getAudioTracks());
 
@@ -1579,7 +1299,8 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
   // 'A' idle (no source) | 'B' source ready | 'C' recording | 'D' paused
   function setUiState(state) {
     S.uiState = state;
-    const sb = $('startBtn'), cb = $('confirmBtn'), pb = $('pauseBtn'), stb = $('stopBtn');
+    const sb = $('startBtn'), cb = $('confirmBtn'), xb = $('cancelBtn'), pb = $('pauseBtn'), stb = $('stopBtn');
+    xb.style.display = state === 'B' ? '' : 'none';
     const hint = $('setupHint'), ph = $('placeholder'), pht = $('placeholderText');
     const appEl = $('app');
     if (appEl) appEl.classList.toggle('is-recording', state === 'C' || state === 'D');
@@ -1604,7 +1325,7 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
       pb.disabled = true; pb.textContent = '暂停';
       stb.disabled = true;
       hint.style.display = '';
-      hint.textContent = '准备就绪，点击下方「开始录制」（可拖动裁切框调整范围）';
+      hint.textContent = '准备就绪，画面将完整缩放进所选比例（不裁切），点击下方「开始录制」';
     } else if (state === 'C') {
       sb.style.display = '';
       sb.classList.add('recording');
@@ -1658,6 +1379,7 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     S.paused = false;
     stopTimer();
     cancelAnimationFrame(S.animFrame);
+    stopBgTick();
     floatBar.classList.remove('show');
     $('recBar').classList.remove('show');
     closePip();
@@ -1748,7 +1470,6 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     $('previewSection').style.display = '';
     controlsPanel.style.display = '';
     placeholder.style.display = '';
-    cropOverlay.classList.remove('active');
     camPip.style.display = 'none';
     camPreviewFull.style.display = 'none';
 
@@ -1781,21 +1502,41 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
 
   // ============ Canvas Rendering ============
   function setupCanvas() {
+    const [rw, rh] = S.ratio;
+    const aspect = rw / rh;
     if (S.mode === 'cam' || S.mode === 'board') {
-      const [rw, rh] = S.ratio;
       const baseH = 720;
-      canvas.width = Math.round(baseH * (rw / rh));
+      canvas.width = Math.round(baseH * aspect);
       canvas.height = baseH;
     } else {
-      const scaleX = screenVideo.videoWidth / previewContainer.offsetWidth;
-      const scaleY = screenVideo.videoHeight / previewContainer.offsetHeight;
-      canvas.width = Math.round(S.cropRect.w * scaleX);
-      canvas.height = Math.round(S.cropRect.h * scaleY);
+      // Output frame = chosen ratio; the FULL source letterboxes inside it
+      // (never cropped). Base the frame's short side on the source so quality
+      // is preserved (e.g. 1080p source → 1080p-tall 16:9 frame).
+      const shortSide = Math.min(screenVideo.videoHeight || 1080, 1440);
+      if (aspect >= 1) {
+        canvas.height = shortSide;
+        canvas.width = Math.round(shortSide * aspect);
+      } else {
+        canvas.width = shortSide;
+        canvas.height = Math.round(shortSide / aspect);
+      }
     }
+  }
+
+  // Contain-fit rect of the full source inside the output frame (letterbox)
+  function fitDestRect(vw, vh, cw, ch) {
+    const scale = Math.min(cw / vw, ch / vh);
+    const dw = vw * scale, dh = vh * scale;
+    return { x: (cw - dw) / 2, y: (ch - dh) / 2, w: dw, h: dh };
   }
 
   function renderLoop() {
     if (!S.recording && !S.screenStream && !S.camStream && S.mode !== 'board') return;
+    renderFrame();
+    S.animFrame = requestAnimationFrame(renderLoop);
+  }
+
+  function renderFrame() {
     const cw = canvas.width, ch = canvas.height;
     ctx.clearRect(0, 0, cw, ch);
 
@@ -1804,7 +1545,7 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
       syncBoardDrawCanvas();
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, cw, ch);
-      if (S.camReady && S.camStream) drawCamPipSolid(cw, ch);
+      if (S.camReady && S.camStream && !S.camHidden) drawCamPipSolid(cw, ch);
     } else if (S.mode === 'cam') {
       if (S.camBg === 'fill') {
         ctx.filter = getCamFilter();
@@ -1816,24 +1557,26 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
         drawCamPipSolid(cw, ch);
       }
     } else {
-      const scaleX = screenVideo.videoWidth / previewContainer.offsetWidth;
-      const scaleY = screenVideo.videoHeight / previewContainer.offsetHeight;
-      const cr = S.cropRect;
-      let srcX = cr.x * scaleX, srcY = cr.y * scaleY;
-      let srcW = cr.w * scaleX, srcH = cr.h * scaleY;
+      const vw = screenVideo.videoWidth, vh = screenVideo.videoHeight;
+      if (!vw || !vh) return;
+      // Letterbox background, then contain-fit the FULL source (no cropping)
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, cw, ch);
+      const dst = fitDestRect(vw, vh, cw, ch);
+      let srcX = 0, srcY = 0, srcW = vw, srcH = vh;
       // Resolve the active zoom: smart auto-zoom takes precedence over the
       // discrete click-to-zoom so they never compound into a double zoom.
       let zFactor = 1, zfx = 0.5, zfy = 0.5;
-      if (S.az.enabled && screenVideo.videoWidth) {
+      if (S.az.enabled) {
         updateAutoZoom();
         if (S.az.level > 1.001) { zFactor = S.az.level; zfx = S.az.fx; zfy = S.az.fy; }
-      } else if (S.fx.clickMode === 'zoom' && S.fx.zoomState && screenVideo.videoWidth) {
+      } else if (S.fx.clickMode === 'zoom' && S.fx.zoomState) {
         const z = computeZoomFactor();
         if (z > 1.001) { zFactor = z; zfx = S.fx.zoomState.x; zfy = S.fx.zoomState.y; }
       }
       if (zFactor > 1.001) {
-        const fx = zfx * screenVideo.videoWidth;
-        const fy = zfy * screenVideo.videoHeight;
+        const fx = zfx * vw;
+        const fy = zfy * vh;
         const newW = srcW / zFactor, newH = srcH / zFactor;
         let newX = fx - (fx - srcX) / zFactor;
         let newY = fy - (fy - srcY) / zFactor;
@@ -1841,25 +1584,40 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
         newY = Math.max(srcY, Math.min(srcY + srcH - newH, newY));
         srcX = newX; srcY = newY; srcW = newW; srcH = newH;
       }
-      S.fx._src = { x: srcX, y: srcY, w: srcW, h: srcH, vw: screenVideo.videoWidth, vh: screenVideo.videoHeight };
-      ctx.drawImage(screenVideo, srcX, srcY, srcW, srcH, 0, 0, cw, ch);
-      if (S.mode === 'screen_cam' && S.camStream) drawCamPip(cw, ch);
+      S.fx._src = { x: srcX, y: srcY, w: srcW, h: srcH, vw, vh };
+      S.fx._dst = dst;
+      ctx.drawImage(screenVideo, srcX, srcY, srcW, srcH, dst.x, dst.y, dst.w, dst.h);
+      if (S.mode === 'screen_cam' && S.camStream && !S.camHidden) drawCamPip(cw, ch);
     }
-    // Composite drawing annotations
+    // Composite drawing annotations (白板笔迹层)
     if (drawCanvas.width > 0 && drawCanvas.height > 0) {
       ctx.drawImage(drawCanvas, 0, 0, drawCanvas.width, drawCanvas.height, 0, 0, cw, ch);
     }
-    // Spotlight / vignette: dim everything except a bright disc around the cursor
-    const isScreenMode = S.mode !== 'cam' && S.mode !== 'board';
-    if (isScreenMode) drawSpotlight(cw, ch);
-    // Cursor FX overlay (after annotations so they sit on top)
-    if (isScreenMode) drawCursorEffects(cw, ch);
-    // Custom fake cursor (selectable style + click feedback), topmost over FX
-    if (isScreenMode) drawFakeCursor(cw, ch);
-    // Screen Studio cinematic frame: wrap the whole composited content in a
-    // padded, rounded, shadowed card on a gradient background (screen modes only).
-    if (S.bg.enabled && isScreenMode && cw > 0 && ch > 0) applyBgFrame(cw, ch);
-    S.animFrame = requestAnimationFrame(renderLoop);
+    // Cursor FX overlay (trail / ripples), topmost
+    if (S.mode !== 'cam' && S.mode !== 'board') drawCursorEffects(cw, ch);
+  }
+
+  // 后台绘制驱动:标签页被遮挡/最小化时(录整个屏幕后切去别的窗口就是这种情况),
+  // Chrome 会停发 requestAnimationFrame,canvas 不再更新,录出来的视频严重卡顿。
+  // Worker 里的 setInterval 不受页面可见性节流,页面不可见期间由它顶替 rAF 驱动绘制。
+  let bgTickWorker = null;
+  function startBgTick() {
+    if (bgTickWorker) return;
+    const src = URL.createObjectURL(new Blob(['setInterval(function(){postMessage(0)},33)'], { type: 'text/javascript' }));
+    bgTickWorker = new Worker(src);
+    URL.revokeObjectURL(src);
+    bgTickWorker.onmessage = () => { if (document.hidden && S.recording) renderFrame(); };
+  }
+  function stopBgTick() {
+    if (bgTickWorker) { bgTickWorker.terminate(); bgTickWorker = null; }
+  }
+
+  // 录制中隐藏/恢复摄像头头像:头像挡住要展示的内容时一键移除,成片同步生效,可随时恢复
+  function toggleCamHidden() {
+    S.camHidden = !S.camHidden;
+    camPip.style.display = S.camHidden ? 'none' : '';
+    $('floatCamBtn').textContent = S.camHidden ? '显示头像' : '隐藏头像';
+    updatePopupUI();
   }
 
   // Smart auto-zoom: ease the zoom level + focus each frame. Zooms IN toward the
@@ -1880,48 +1638,6 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     const aF = 1 - Math.exp(-dt / AUTOZOOM.FOCUS_TAU);
     az.fx += (az.tx - az.fx) * aF;
     az.fy += (az.ty - az.fy) * aF;
-  }
-
-  // Post-process the already-composited canvas into a Screen Studio style card:
-  // snapshot content → repaint background → draw content inset + rounded + shadow.
-  function applyBgFrame(cw, ch) {
-    let buf = S.bg.buf || (S.bg.buf = document.createElement('canvas'));
-    if (buf.width !== cw || buf.height !== ch) { buf.width = cw; buf.height = ch; }
-    const bctx = buf.getContext('2d');
-    bctx.clearRect(0, 0, cw, ch);
-    bctx.drawImage(canvas, 0, 0);
-
-    // Paint the background fill across the whole frame
-    ctx.clearRect(0, 0, cw, ch);
-    const mk = BG_PRESETS[S.bg.preset] || BG_PRESETS.aurora;
-    ctx.fillStyle = mk(ctx, cw, ch);
-    ctx.fillRect(0, 0, cw, ch);
-
-    // Inset rect — uniform scale + centered so the screen aspect is preserved
-    const pad = Math.min(cw, ch) * S.bg.padding;
-    const scale = Math.min((cw - 2 * pad) / cw, (ch - 2 * pad) / ch);
-    const dw = cw * scale, dh = ch * scale;
-    const dx = (cw - dw) / 2, dy = (ch - dh) / 2;
-    const rad = Math.min(dw, dh) * S.bg.radius;
-
-    // Soft drop shadow under the card
-    if (S.bg.shadow) {
-      ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,0.40)';
-      ctx.shadowBlur = pad * 0.85;
-      ctx.shadowOffsetY = pad * 0.22;
-      ctx.fillStyle = '#000';
-      roundRect(ctx, dx, dy, dw, dh, rad);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    // Clip to the rounded card and draw the snapshot scaled into it
-    ctx.save();
-    roundRect(ctx, dx, dy, dw, dh, rad);
-    ctx.clip();
-    ctx.drawImage(buf, 0, 0, cw, ch, dx, dy, dw, dh);
-    ctx.restore();
   }
 
   // Click-to-emphasize: avatar scales up on mouse click, holds, then eases
@@ -1986,18 +1702,20 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     ctx.restore();
   }
 
-  // screen_cam: avatar mapped from the crop rect
+  // screen_cam: the preview container IS the output frame (same ratio), so
+  // container coords map 1:1 onto the canvas frame.
   function drawCamPip(cw, ch) {
+    const contW = previewContainer.offsetWidth, contH = previewContainer.offsetHeight;
+    if (!contW || !contH) return;
     const pipX = camPip.offsetLeft, pipY = camPip.offsetTop;
     const pipW = camPip.offsetWidth, pipH = camPip.offsetHeight;
-    const cr = S.cropRect;
-    const sx = cw / cr.w;
-    const sy = ch / cr.h;
+    const sx = cw / contW;
+    const sy = ch / contH;
     // Force a square in canvas space — keeps the circle truly round
-    // even when scaleX != scaleY (caused by container vs video aspect mismatch).
+    // even when scaleX != scaleY (caused by rounding mismatch).
     const relSize = Math.round(((pipW * sx) + (pipH * sy)) / 2);
-    const relCx = (pipX + pipW / 2 - cr.x) * sx;
-    const relCy = (pipY + pipH / 2 - cr.y) * sy;
+    const relCx = (pipX + pipW / 2) * sx;
+    const relCy = (pipY + pipH / 2) * sy;
     paintCamAvatar(relCx, relCy, relSize);
   }
 
@@ -2198,8 +1916,8 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
       console.warn('Recording PiP failed:', e);
     }
 
-    // Show pen toolbar
-    showPenToolbar(true);
+    // 画笔工具栏仅白板模式常驻(屏幕模式已去掉画笔标注)
+    if (S.mode === 'board') showPenToolbar(true);
 
     // --- 2. Controls: window.open popup ---
     const cw = 280, ch = 70;
@@ -2227,6 +1945,7 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
         <div class="dot blink" id="d"></div>
         <span class="time" id="t">00:00:00</span>
         <span class="spacer"></span>
+        <button class="btn btn-pause" id="c">隐藏头像</button>
         <button class="btn btn-pause" id="p">暂停</button>
         <button class="btn btn-stop" id="s">停止</button>
       </body></html>`);
@@ -2234,6 +1953,9 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
       ctrlWin.document.title = '录制控制';
       ctrlWin.document.getElementById('p').onclick = () => { togglePause(); updatePopupUI(); };
       ctrlWin.document.getElementById('s').onclick = () => { stopRecording(); };
+      const camBtn = ctrlWin.document.getElementById('c');
+      if ((S.mode === 'screen_cam' || S.mode === 'board') && S.camReady) camBtn.onclick = () => toggleCamHidden();
+      else camBtn.style.display = 'none';
       ctrlWin.addEventListener('beforeunload', () => { ctrlWin = null; if (S.recording) stopRecording(); });
     }
 
@@ -2249,6 +1971,8 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
       if (t) { t.textContent = formatTime(S.elapsed); t.className = 'time' + (S.paused ? ' paused' : ''); }
       if (d) d.className = 'dot' + (S.paused ? ' paused' : ' blink');
       if (p) p.textContent = S.paused ? '继续' : '暂停';
+      const c = ctrlWin.document.getElementById('c');
+      if (c) c.textContent = S.camHidden ? '显示头像' : '隐藏头像';
     } catch (e) {}
   }
 
@@ -2671,146 +2395,9 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
     const rx = (vx - s.x) / s.w;
     const ry = (vy - s.y) / s.h;
     if (rx < -0.02 || rx > 1.02 || ry < -0.02 || ry > 1.02) return null;
+    const d = S.fx._dst;
+    if (d) return [d.x + rx * d.w, d.y + ry * d.h];
     return [rx * cw, ry * ch];
-  }
-
-  // ===== Spotlight / vignette around the cursor =====
-  function drawSpotlight(cw, ch) {
-    if (!S.spot.enabled) return;
-    const cp = S.fx.cursorPos;
-    if (!cp) return; // 无后台坐标不画
-    // Follow the smoothed fake-cursor position when available, else raw cursor
-    let nx = cp.x, ny = cp.y;
-    if (S.cursorFx.enabled && S.cursorFx.has) { nx = S.cursorFx.x; ny = S.cursorFx.y; }
-    const pt = screenNormToCanvas(nx, ny, cw, ch);
-    if (!pt) return;
-    const px = pt[0], py = pt[1];
-    const R = Math.min(cw, ch) * S.spot.radius;
-    const g = ctx.createRadialGradient(px, py, R * 0.55, px, py, R * 1.5);
-    g.addColorStop(0, 'rgba(0,0,0,0)');
-    g.addColorStop(1, 'rgba(0,0,0,' + S.spot.dim + ')');
-    ctx.save();
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, cw, ch);
-    ctx.restore();
-  }
-
-  // ===== Synthesised click "tick" — routed into the recording's audio dest =====
-  function playClick() {
-    const ac = S.audioCtx, dest = S.recDest;
-    if (!ac || !dest || !S.recording) return;
-    const t = ac.currentTime;
-    const osc = ac.createOscillator();
-    const g = ac.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(1150, t);
-    osc.frequency.exponentialRampToValueAtTime(520, t + 0.045);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.34, t + 0.005);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
-    osc.connect(g); g.connect(dest);
-    osc.start(t); osc.stop(t + 0.08);
-  }
-
-  // ===== Custom fake cursor =====
-  const CURSOR_STYLES = ['arrow', 'hand', 'ring', 'dot'];
-  function drawFakeCursor(cw, ch) {
-    const cf = S.cursorFx;
-    if (!cf.enabled) return;
-    const cp = S.fx.cursorPos;
-    if (!cp) return; // 没有后台坐标就不画
-    const now = performance.now();
-    // Smooth the position toward the latest backend cursor (de-jitter)
-    const dt = cf.lastT ? Math.min(100, now - cf.lastT) : 16;
-    cf.lastT = now;
-    if (!cf.has) { cf.x = cp.x; cf.y = cp.y; cf.has = true; }
-    else {
-      const a = 1 - Math.exp(-dt / CURSOR_TAU);
-      cf.x += (cp.x - cf.x) * a;
-      cf.y += (cp.y - cf.y) * a;
-    }
-    // Idle auto-hide: fade out after ~2.6s without cursor movement, fade back on move
-    const targetA = (cf.idleHide && (now - (cp.t || 0)) > 2600) ? 0 : 1;
-    cf.alpha += (targetA - cf.alpha) * (1 - Math.exp(-dt / 180));
-    if (cf.alpha < 0.02) return;
-    const pt = screenNormToCanvas(cf.x, cf.y, cw, ch);
-    if (!pt) return;
-    const px = pt[0], py = pt[1];
-    const base = Math.min(cw, ch) * 0.042; // on-canvas cursor footprint
-    // Click feedback: press-scale + expanding ring
-    const cdt = now - cf.clickT0;
-    const press = (cdt >= 0 && cdt < 220) ? Math.sin((cdt / 220) * Math.PI) : 0;
-    if (cdt >= 0 && cdt < 460) {
-      const t = cdt / 460;
-      const r = base * (0.5 + 2.4 * easeOutCubic(t));
-      ctx.save();
-      ctx.globalAlpha = cf.alpha;
-      ctx.strokeStyle = `rgba(0,180,216,${(1 - t) * 0.6})`;
-      ctx.lineWidth = Math.max(1.5, base * 0.10 * (1 - t));
-      ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.stroke();
-      ctx.restore();
-    }
-    ctx.save();
-    ctx.globalAlpha = cf.alpha;
-    ctx.translate(px, py);
-    ctx.scale(1 - 0.18 * press, 1 - 0.18 * press);
-    if (cf.style === 'arrow') drawArrowCursor(base);
-    else if (cf.style === 'hand') drawEmojiCursor('👆', base); // 👆
-    else if (cf.style === 'ring') drawRingCursor(base);
-    else drawDotCursor(base);
-    ctx.restore();
-  }
-  function drawArrowCursor(base) {
-    const k = base / 19;
-    ctx.save();
-    ctx.scale(k, k);
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(0, 16.8);
-    ctx.lineTo(3.6, 13.2);
-    ctx.lineTo(6.0, 18.8);
-    ctx.lineTo(8.1, 17.9);
-    ctx.lineTo(5.7, 12.5);
-    ctx.lineTo(10.2, 12.5);
-    ctx.closePath();
-    ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 2.4; ctx.shadowOffsetY = 1;
-    ctx.fillStyle = '#fff'; ctx.fill();
-    ctx.shadowColor = 'transparent';
-    ctx.lineWidth = 1.4; ctx.strokeStyle = 'rgba(20,22,30,0.92)'; ctx.stroke();
-    ctx.restore();
-  }
-  function drawRingCursor(base) {
-    const r = base * 0.5;
-    ctx.save();
-    ctx.fillStyle = 'rgba(0,180,216,0.22)';
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-    ctx.lineWidth = Math.max(2, base * 0.15);
-    ctx.strokeStyle = 'rgba(0,180,216,0.95)';
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
-    ctx.restore();
-  }
-  function drawDotCursor(base) {
-    const r = base * 0.34;
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 3;
-    ctx.fillStyle = 'rgba(255,71,87,0.88)';
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-    ctx.shadowColor = 'transparent';
-    ctx.lineWidth = Math.max(1.5, base * 0.07);
-    ctx.strokeStyle = 'rgba(255,255,255,0.92)';
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
-    ctx.restore();
-  }
-  function drawEmojiCursor(glyph, base) {
-    const fs = base * 1.7;
-    ctx.save();
-    ctx.font = fs + 'px serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 1;
-    // 👆 fingertip sits near the glyph top — push the glyph down so the tip ≈ point
-    ctx.fillText(glyph, 0, fs * 0.42);
-    ctx.restore();
   }
 
   function drawCursorEffects(cw, ch) {
@@ -3008,10 +2595,6 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
         if (S.camZoomClick) S.fx.camPulseT0 = now;
         // 点击视为强活动：把焦点拉到点击处并立即续命
         if (S.az.enabled) { S.az.tx = m.x; S.az.ty = m.y; S.az.lastActivity = now; }
-        // 自定义光标点击反馈动画
-        if (S.cursorFx.enabled) S.cursorFx.clickT0 = now;
-        // 点击咔哒声(录进成片)
-        if (S.clickSound.enabled) playClick();
       }
     };
   }
@@ -3238,7 +2821,7 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none;background:no
   });
 
   // ============ Window Resize ============
-  window.addEventListener('resize', () => { if (cropOverlay.classList.contains('active')) initCrop(); });
+  window.addEventListener('resize', () => { if (!S.recording) updatePreviewShape(); });
 
 })();
 </script>
